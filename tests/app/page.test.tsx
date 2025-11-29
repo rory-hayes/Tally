@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     replace: vi.fn(),
   }),
+  usePathname: () => "/",
 }));
 
 import Home from "@/app/page";

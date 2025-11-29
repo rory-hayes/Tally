@@ -29,6 +29,10 @@ if (typeof window !== "undefined") {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   }));
+
+  window.getComputedStyle = window.getComputedStyle ?? (() => ({
+    getPropertyValue: () => "",
+  })) as typeof window.getComputedStyle;
 }
 
 class ResizeObserverMock {

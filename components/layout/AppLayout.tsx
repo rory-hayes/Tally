@@ -8,8 +8,8 @@ import {
   SettingOutlined,
 } from "@ant-design/icons";
 import styles from "./AppLayout.module.css";
-import { PropsWithChildren, useState } from "react";
-import { useRouter } from "next/navigation";
+import { PropsWithChildren, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth";
 
 const menuItems: MenuProps["items"] = [
@@ -32,7 +32,34 @@ const menuItems: MenuProps["items"] = [
 
 export default function AppLayout({ children }: PropsWithChildren) {
   const router = useRouter();
+  const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
+
+  const selectedKey = useMemo(() => {
+    if (pathname.startsWith("/clients")) {
+      return "clients";
+    }
+    if (pathname.startsWith("/settings")) {
+      return "settings";
+    }
+    return "dashboard";
+  }, [pathname]);
+
+  const handleMenuClick: MenuProps["onClick"] = ({ key }) => {
+    if (key === selectedKey) {
+      return;
+    }
+    switch (key) {
+      case "clients":
+        router.push("/clients");
+        break;
+      case "settings":
+        router.push("/settings");
+        break;
+      default:
+        router.push("/");
+    }
+  };
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -59,7 +86,8 @@ export default function AppLayout({ children }: PropsWithChildren) {
         <Menu
           theme="dark"
           mode="inline"
-          defaultSelectedKeys={["dashboard"]}
+          selectedKeys={[selectedKey]}
+          onClick={handleMenuClick}
           items={menuItems}
         />
       </Layout.Sider>

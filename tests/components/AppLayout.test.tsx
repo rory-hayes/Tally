@@ -1,12 +1,16 @@
 import { render, screen, act, fireEvent, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 
-const mockReplace = vi.fn();
+const mockRouter = {
+  replace: vi.fn(),
+  push: vi.fn(),
+};
+
+let mockPathname = "/";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-  }),
+  useRouter: () => mockRouter,
+  usePathname: () => mockPathname,
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -57,7 +61,13 @@ describe("AppLayout", () => {
     await renderLayout();
     fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
     await waitFor(() => expect(signOut).toHaveBeenCalled());
-    expect(mockReplace).toHaveBeenCalledWith("/login");
+    expect(mockRouter.replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("navigates via sidebar menu", async () => {
+    await renderLayout();
+    fireEvent.click(screen.getByRole("menuitem", { name: /clients/i }));
+    expect(mockRouter.push).toHaveBeenCalledWith("/clients");
   });
 });
 

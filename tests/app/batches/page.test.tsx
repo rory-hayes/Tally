@@ -12,6 +12,10 @@ const storageMocks = vi.hoisted(() => ({
   uploadBatchFiles: vi.fn(),
 }));
 
+const jobMocks = vi.hoisted(() => ({
+  invokeCreateProcessingJobs: vi.fn(),
+}));
+
 vi.mock("@/context/OrganisationContext", () => ({
   useOrganisation: () => ({ organisationId: "org-123", role: "admin" }),
 }));
@@ -23,6 +27,10 @@ vi.mock("@/lib/repositories/batches", () => ({
 
 vi.mock("@/lib/storage/batchUploads", () => ({
   uploadBatchFiles: storageMocks.uploadBatchFiles,
+}));
+
+vi.mock("@/lib/functions/createProcessingJobs", () => ({
+  invokeCreateProcessingJobs: jobMocks.invokeCreateProcessingJobs,
 }));
 
 const mockMessage = vi.hoisted(() => ({
@@ -120,6 +128,7 @@ describe("BatchUploadContent", () => {
       total_files: batchFixture.total_files + 1,
     });
     storageMocks.uploadBatchFiles.mockResolvedValue(["path/to/sample.pdf"]);
+    jobMocks.invokeCreateProcessingJobs.mockResolvedValue({ created: 1 });
   });
 
   it("enables upload button once files are selected", async () => {
@@ -153,7 +162,37 @@ describe("BatchUploadContent", () => {
       batchFixture.id,
       { total_files: 1 }
     );
-    expect(mockMessage.success).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(jobMocks.invokeCreateProcessingJobs).toHaveBeenCalledWith(
+        batchFixture.id
+      );
+    });
+
+    expect(mockMessage.success).toHaveBeenCalledWith(
+      "Files uploaded and queued for processing."
+    );
+  });
+
+  it("surfaces errors when processing jobs cannot be created", async () => {
+    jobMocks.invokeCreateProcessingJobs.mockRejectedValueOnce(
+      new Error("Boom")
+    );
+
+    render(<BatchUploadContent batchId={batchFixture.id} />);
+    await screen.findByText(/Batch upload/i);
+
+    fireEvent.click(screen.getByText(/mock-add-file/i));
+    fireEvent.click(screen.getByText(/Upload files/i));
+
+    await waitFor(() =>
+      expect(storageMocks.uploadBatchFiles).toHaveBeenCalled()
+    );
+
+    await waitFor(() =>
+      expect(jobMocks.invokeCreateProcessingJobs).toHaveBeenCalled()
+    );
+
+    expect(mockMessage.error).toHaveBeenCalledWith("Boom");
   });
 });
 

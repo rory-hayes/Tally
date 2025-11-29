@@ -22,6 +22,7 @@ import {
   updateBatchStatus,
 } from "@/lib/repositories/batches";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
+import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
 
 export default function BatchUploadPage() {
   const params = useParams<{ batchId: string }>();
@@ -98,9 +99,22 @@ export function BatchUploadContent({ batchId }: BatchUploadContentProps) {
       const updated = await updateBatchStatus(organisationId, batchId, {
         total_files: (batch.total_files ?? 0) + files.length,
       });
-      setBatch(updated);
+
+      let nextBatchState: BatchRow = updated;
+      try {
+        await invokeCreateProcessingJobs(batchId);
+        nextBatchState = { ...updated, status: "processing" };
+        message.success("Files uploaded and queued for processing.");
+      } catch (jobError) {
+        message.error(
+          jobError instanceof Error
+            ? jobError.message
+            : "Processing jobs could not be created."
+        );
+      }
+
+      setBatch(nextBatchState);
       setFileList([]);
-      message.success("Files uploaded successfully.");
     } catch (err) {
       message.error(
         err instanceof Error ? err.message : "Upload failed. Try again."

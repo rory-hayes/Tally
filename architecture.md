@@ -55,6 +55,11 @@ Multi-tenancy is enforced via:
 - `organisation_id`
 - `client_id`
 - `period_label` (e.g., `2025-04`, or free text)
+- `storage_path` (text, path to original upload)
+- `status` (`pending`, `processing`, `completed`, `failed`)
+- `error` (text, nullable)
+- `created_at`
+- `updated_at`
 - `status` (`pending`, `processing`, `completed`, `failed`)
 - `total_files`
 - `processed_files`

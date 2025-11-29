@@ -93,7 +93,10 @@ export async function updateBatchStatus(
   organisationId: string,
   batchId: string,
   updates: Partial<
-    Pick<BatchRow, "status" | "total_files" | "processed_files" | "notes">
+    Pick<
+      BatchRow,
+      "status" | "total_files" | "processed_files" | "notes"
+    >
   >
 ): Promise<BatchRow> {
   const supabase = getSupabaseBrowserClient();

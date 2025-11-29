@@ -21,6 +21,16 @@ npm run test:watch  # watch mode during development
 
 A GitHub Actions workflow (`.github/workflows/test.yml`) runs `npm test` on pushes and pull requests targeting `main`, so the latest commit stays green.
 
+## Database Schema
+
+Initial Supabase tables live in `scripts/migrations/0001_initial_schema.sql`. Apply them with the Supabase CLI or `psql`:
+
+```bash
+psql "$SUPABASE_DB_URL" -f scripts/migrations/0001_initial_schema.sql
+```
+
+`scripts/tests/schema_smoke_test.sql` performs a lightweight sanity check (table existence + counts) once the schema is in place.
+
 ## Learn More
 
 - [Next.js Documentation](https://nextjs.org/docs) – features, API, and guides.

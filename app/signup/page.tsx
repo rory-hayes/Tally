@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { SignupForm } from "@/components/auth/SignupForm";
+import { isSessionInvalidError } from "@/lib/authErrors";
 
 const containerStyle: React.CSSProperties = {
   minHeight: "100vh",
@@ -20,12 +21,49 @@ export default function SignupPage() {
   const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
     const supabase = getSupabaseBrowserClient();
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+
+    async function redirectIfAuthenticated() {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted || !data.session) {
+        return;
+      }
+
+      const { data: userData, error } = await supabase.auth.getUser();
+      if (!mounted) {
+        return;
+      }
+
+      if (error) {
+        if (isSessionInvalidError(error.message)) {
+          await supabase.auth.signOut();
+        }
+        return;
+      }
+
+      if (userData.user) {
+        router.replace("/");
+      }
+    }
+
+    redirectIfAuthenticated();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) {
+        return;
+      }
+      if (session) {
         router.replace("/");
       }
     });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   return (

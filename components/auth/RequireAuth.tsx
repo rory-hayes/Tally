@@ -1,32 +1,64 @@
 "use client";
 
 import { PropsWithChildren, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { useRouter, usePathname } from "next/navigation";
 import { Spin } from "antd";
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import {
+  OrganisationProvider,
+  OrganisationContextValue,
+} from "@/context/OrganisationContext";
+import { fetchCurrentProfile } from "@/lib/repositories/profiles";
 
-type AuthStatus = "checking" | "authenticated";
+type AuthState =
+  | { status: "checking" }
+  | { status: "needsOrg" }
+  | { status: "ready"; profile: OrganisationContextValue };
 
 export function RequireAuth({ children }: PropsWithChildren) {
-  const [status, setStatus] = useState<AuthStatus>("checking");
+  const [state, setState] = useState<AuthState>({ status: "checking" });
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     let mounted = true;
     const supabase = getSupabaseBrowserClient();
 
-    async function ensureSession() {
+    const loadProfile = async () => {
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
 
-      if (!data.session) {
+      const session = data.session;
+      if (!session) {
         router.replace("/login");
-      } else {
-        setStatus("authenticated");
+        setState({ status: "checking" });
+        return;
       }
-    }
 
-    ensureSession();
+      const profile = await fetchCurrentProfile();
+
+      if (!mounted) return;
+
+      if (!profile || !profile.organisation_id) {
+        setState({ status: "needsOrg" });
+        if (pathname !== "/onboarding") {
+          router.replace("/onboarding");
+        }
+        return;
+      }
+
+      const organisationId = profile.organisation_id!;
+
+      setState({
+        status: "ready",
+        profile: {
+          organisationId,
+          role: profile.role,
+        },
+      });
+    };
+
+    loadProfile();
 
     const {
       data: { subscription },
@@ -34,10 +66,10 @@ export function RequireAuth({ children }: PropsWithChildren) {
       if (!mounted) return;
 
       if (!session) {
-        setStatus("checking");
+        setState({ status: "checking" });
         router.replace("/login");
       } else {
-        setStatus("authenticated");
+        loadProfile();
       }
     });
 
@@ -45,9 +77,9 @@ export function RequireAuth({ children }: PropsWithChildren) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, pathname]);
 
-  if (status !== "authenticated") {
+  if (state.status === "checking") {
     return (
       <div
         style={{
@@ -62,6 +94,27 @@ export function RequireAuth({ children }: PropsWithChildren) {
     );
   }
 
-  return <>{children}</>;
+  if (state.status === "needsOrg") {
+    if (pathname !== "/onboarding") {
+      return (
+        <div
+          style={{
+            minHeight: "60vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Spin />
+        </div>
+      );
+    }
+
+    return <>{children}</>;
+  }
+
+  return (
+    <OrganisationProvider value={state.profile}>{children}</OrganisationProvider>
+  );
 }
 

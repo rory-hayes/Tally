@@ -23,6 +23,6 @@ export async function getClientsForOrganisation(
     throw new Error(`Failed to load clients: ${error.message}`);
   }
 
-  return data ?? [];
+  return (data ?? []) as unknown as ClientRow[];
 }
 

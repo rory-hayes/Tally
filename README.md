@@ -29,7 +29,12 @@ Initial Supabase tables live in `scripts/migrations/0001_initial_schema.sql`. Ap
 psql "$SUPABASE_DB_URL" -f scripts/migrations/0001_initial_schema.sql
 ```
 
-`scripts/tests/schema_smoke_test.sql` performs a lightweight sanity check (table existence + counts) once the schema is in place.
+`scripts/migrations/0002_rls_policies.sql` enables row-level security and enforces organisation scoping via the `current_user_org_id()` helper. Run it after the base schema so all tables are protected.
+
+Smoke checks:
+
+- `scripts/tests/schema_smoke_test.sql` – validates table creation.
+- `scripts/tests/rls_isolation_test.sql` – seeds two organisations, impersonates each user via `request.jwt.claim.sub`, and demonstrates that cross-org reads are blocked before rolling back.
 
 ## Learn More
 

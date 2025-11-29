@@ -1,12 +1,15 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BatchRow, CreateBatchInput } from "@/lib/repositories/batches";
-import type { ClientRow } from "@/lib/repositories/clients";
+import type { BatchRow } from "@/lib/repositories/batches";
+import { batchFixture } from "@/tests/fixtures/batches";
+import { clientFixture } from "@/tests/fixtures/clients";
+import { BatchUploadContent } from "@/app/batches/[batchId]/page";
 
 const repoMocks = vi.hoisted(() => ({
   getClientById: vi.fn(),
   getBatchesForClient: vi.fn(),
   createBatchForClient: vi.fn(),
+  getBatchById: vi.fn(),
 }));
 
 vi.mock("@/lib/repositories/clients", () => ({
@@ -16,6 +19,7 @@ vi.mock("@/lib/repositories/clients", () => ({
 vi.mock("@/lib/repositories/batches", () => ({
   getBatchesForClient: repoMocks.getBatchesForClient,
   createBatchForClient: repoMocks.createBatchForClient,
+  getBatchById: repoMocks.getBatchById,
 }));
 
 vi.mock("@/context/OrganisationContext", () => ({
@@ -75,20 +79,14 @@ vi.mock("antd", async () => {
 
 import { ClientDetailContent } from "@/app/clients/[clientId]/page";
 
-const clientFixture: ClientRow = {
-  id: "client-123",
-  name: "Acme Corp",
-  country: "IE",
-  payroll_system: "Sage",
-};
-
 const emptyBatchList: BatchRow[] = [];
 
 describe("ClientDetailContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    repoMocks.getClientById.mockResolvedValue(clientFixture);
+    repoMocks.getClientById.mockResolvedValue({ ...clientFixture });
     repoMocks.getBatchesForClient.mockResolvedValue(emptyBatchList);
+    repoMocks.getBatchById.mockResolvedValue({ ...batchFixture });
   });
 
   it("opens batch modal", async () => {
@@ -107,18 +105,7 @@ describe("ClientDetailContent", () => {
   });
 
   it("creates batch and updates table", async () => {
-    const createdBatch: Partial<BatchRow> & { id: string } = {
-      id: "batch-1",
-      organisation_id: "org-123",
-      client_id: "client-123",
-      period_label: "Jan 2025",
-      status: "pending",
-      total_files: 0,
-      processed_files: 0,
-      notes: null,
-    };
-
-    repoMocks.createBatchForClient.mockResolvedValue(createdBatch);
+    repoMocks.createBatchForClient.mockResolvedValue({ ...batchFixture });
 
     render(<ClientDetailContent clientId="client-123" />);
 
@@ -152,7 +139,30 @@ describe("ClientDetailContent", () => {
       ).toBeInTheDocument()
     );
 
-    expect(mockRouter.push).toHaveBeenCalledWith("/batches/batch-1");
+    expect(mockRouter.push).toHaveBeenCalledWith(`/batches/${batchFixture.id}`);
+  });
+
+  it("navigates to batch upload flow after creation", async () => {
+    repoMocks.createBatchForClient.mockResolvedValue({ ...batchFixture });
+    render(<ClientDetailContent clientId={clientFixture.id} />);
+
+    await screen.findByRole("button", { name: /upload batch/i });
+    fireEvent.click(screen.getByRole("button", { name: /upload batch/i }));
+    fireEvent.change(screen.getByLabelText(/period/i), {
+      target: { value: batchFixture.period_label },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /submit batch/i }));
+
+    await waitFor(() =>
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        `/batches/${batchFixture.id}`
+      )
+    );
+
+    repoMocks.getBatchById.mockResolvedValue({ ...batchFixture });
+    render(<BatchUploadContent batchId={batchFixture.id} />);
+
+    expect(await screen.findByText(/Batch upload/i)).toBeInTheDocument();
   });
 });
 

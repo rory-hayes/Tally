@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, beforeEach, vi } from "vitest";
 import { BatchUploadContent } from "@/app/batches/[batchId]/page";
+import { batchFixture } from "@/tests/fixtures/batches";
 
 const repoMocks = vi.hoisted(() => ({
   getBatchById: vi.fn(),
@@ -113,31 +114,27 @@ describe("BatchUploadContent", () => {
     mockMessage.success.mockReset();
     mockMessage.error.mockReset();
     mockMessage.warning.mockReset();
-    repoMocks.getBatchById.mockResolvedValue({
-      id: "batch-1",
-      organisation_id: "org-123",
-      client_id: "client-1",
-      period_label: "Jan 2025",
-      status: "pending",
-      total_files: 0,
-      processed_files: 0,
-      notes: null,
-    });
+    repoMocks.getBatchById.mockResolvedValue({ ...batchFixture });
     repoMocks.updateBatchStatus.mockResolvedValue({
-      id: "batch-1",
-      organisation_id: "org-123",
-      client_id: "client-1",
-      period_label: "Jan 2025",
-      status: "pending",
-      total_files: 1,
-      processed_files: 0,
-      notes: null,
+      ...batchFixture,
+      total_files: batchFixture.total_files + 1,
     });
     storageMocks.uploadBatchFiles.mockResolvedValue(["path/to/sample.pdf"]);
   });
 
+  it("enables upload button once files are selected", async () => {
+    render(<BatchUploadContent batchId={batchFixture.id} />);
+    await screen.findByText(/Batch upload/i);
+
+    const uploadButton = screen.getByText(/Upload files/i) as HTMLButtonElement;
+    expect(uploadButton).toBeDisabled();
+
+    fireEvent.click(screen.getByText(/mock-add-file/i));
+    expect(uploadButton).not.toBeDisabled();
+  });
+
   it("uploads files and updates batch totals", async () => {
-    render(<BatchUploadContent batchId="batch-1" />);
+    render(<BatchUploadContent batchId={batchFixture.id} />);
 
     await screen.findByText(/Batch upload/i);
 
@@ -146,14 +143,14 @@ describe("BatchUploadContent", () => {
 
     await waitFor(() =>
       expect(storageMocks.uploadBatchFiles).toHaveBeenCalledWith(
-        "batch-1",
+        batchFixture.id,
         expect.any(Array)
       )
     );
 
     expect(repoMocks.updateBatchStatus).toHaveBeenCalledWith(
       "org-123",
-      "batch-1",
+      batchFixture.id,
       { total_files: 1 }
     );
     expect(mockMessage.success).toHaveBeenCalled();

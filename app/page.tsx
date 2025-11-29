@@ -1,66 +1,36 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+ "use client";
+
+import { Card, Space, Typography } from "antd";
+import AppLayout from "@/components/layout/AppLayout";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>Tally Dashboard</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <AppLayout>
+      <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+        <Typography.Title level={3}>Tally Dashboard</Typography.Title>
+        <Typography.Paragraph type="secondary">
+          This is the placeholder overview for the MVP. Replace this copy with
+          live metrics once Supabase wiring is in place.
+        </Typography.Paragraph>
+        <Space orientation="horizontal" size="large" wrap>
+          <Card title="Clients" style={{ minWidth: 280 }}>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              0
+            </Typography.Title>
+            <Typography.Paragraph type="secondary">
+              Active client records
+            </Typography.Paragraph>
+          </Card>
+          <Card title="Open Issues" style={{ minWidth: 280 }}>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              0
+            </Typography.Title>
+            <Typography.Paragraph type="secondary">
+              Critical + warning issues
+            </Typography.Paragraph>
+          </Card>
+        </Space>
+      </Space>
+    </AppLayout>
   );
 }

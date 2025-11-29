@@ -97,9 +97,9 @@ export function ClientsManager() {
   };
 
   return (
-    <Space direction="vertical" size="large" style={{ width: "100%" }}>
+    <Space orientation="vertical" size="large" style={{ width: "100%" }}>
       <Space
-        direction="horizontal"
+        orientation="horizontal"
         align="center"
         style={{ justifyContent: "space-between", width: "100%" }}
       >

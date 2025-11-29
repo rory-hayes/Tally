@@ -55,7 +55,6 @@ export function ClientFormModal({
       onCancel={onCancel}
       onOk={() => form.submit()}
       confirmLoading={submitting}
-      destroyOnHidden
     >
       <Form
         layout="vertical"

@@ -45,9 +45,10 @@ describe("batches repository", () => {
       status: "pending",
       total_files: 5,
       processed_files: 0,
+      notes: null,
     });
     expect(select).toHaveBeenCalledWith(
-      "id, organisation_id, client_id, period_label, status, total_files, processed_files"
+      "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes"
     );
   });
 
@@ -84,6 +85,9 @@ describe("batches repository", () => {
     expect(update).toHaveBeenCalledWith({ status: "processing" });
     expect(eq).toHaveBeenNthCalledWith(1, "organisation_id", "org-1");
     expect(eq).toHaveBeenNthCalledWith(2, "id", "batch-1");
+    expect(select).toHaveBeenCalledWith(
+      "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes"
+    );
   });
 
   it("throws when update payload empty", async () => {

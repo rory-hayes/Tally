@@ -108,3 +108,22 @@ export async function deleteClient(
   }
 }
 
+export async function getClientById(
+  organisationId: string,
+  clientId: string
+): Promise<ClientRow | null> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select(CLIENT_COLUMNS)
+    .eq("organisation_id", organisationId)
+    .eq("id", clientId)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    throw new Error(error.message);
+  }
+
+  return (data ?? null) as ClientRow | null;
+}
+

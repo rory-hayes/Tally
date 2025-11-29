@@ -8,6 +8,7 @@ export type BatchRow = {
   status: string;
   total_files: number;
   processed_files: number;
+  notes: string | null;
 };
 
 export type CreateBatchInput = {
@@ -16,10 +17,11 @@ export type CreateBatchInput = {
   totalFiles: number;
   processedFiles?: number;
   status?: "pending" | "processing" | "completed" | "failed";
+  notes?: string | null;
 };
 
 const BATCH_COLUMNS =
-  "id, organisation_id, client_id, period_label, status, total_files, processed_files";
+  "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes";
 
 export async function createBatchForClient(
   organisationId: string,
@@ -33,6 +35,7 @@ export async function createBatchForClient(
     status: input.status ?? "pending",
     total_files: input.totalFiles,
     processed_files: input.processedFiles ?? 0,
+    notes: input.notes ?? null,
   };
 
   const { data, error } = await supabase
@@ -70,7 +73,9 @@ export async function getBatchesForClient(
 export async function updateBatchStatus(
   organisationId: string,
   batchId: string,
-  updates: Partial<Pick<BatchRow, "status" | "total_files" | "processed_files">>
+  updates: Partial<
+    Pick<BatchRow, "status" | "total_files" | "processed_files" | "notes">
+  >
 ): Promise<BatchRow> {
   const supabase = getSupabaseBrowserClient();
   const sanitizedEntries = Object.entries(updates).filter(

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Table, Button, Popconfirm } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { ClientRow } from "@/lib/repositories/clients";
@@ -19,6 +20,9 @@ const columns = (
     title: "Name",
     dataIndex: "name",
     key: "name",
+    render: (_value, record) => (
+      <Link href={`/clients/${record.id}`}>{record.name}</Link>
+    ),
   },
   {
     title: "Country",

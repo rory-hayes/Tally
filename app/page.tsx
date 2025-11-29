@@ -2,6 +2,7 @@
 
 import { Card, Space, Typography } from "antd";
 import AppLayout from "@/components/layout/AppLayout";
+import { ClientsPreview } from "@/components/clients/ClientsPreview";
 
 export default function Home() {
   return (
@@ -30,6 +31,7 @@ export default function Home() {
             </Typography.Paragraph>
           </Card>
         </Space>
+        <ClientsPreview />
       </Space>
     </AppLayout>
   );

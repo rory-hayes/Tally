@@ -10,6 +10,17 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to see the default page. Edit `app/page.tsx` to start building the UI.
 
+## Supabase Configuration
+
+Create an `.env.local` file with the publishable credentials for the Tally Supabase project:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://jqixmhtgpabvaqdegvdn.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+```
+
+The anon key (see Supabase dashboard) is safe to use in the browser. `lib/supabaseClient.ts` exposes helpers for browser/server clients, and `ClientsPreview` + `useClients` demonstrate querying the `clients` table directly from the dashboard page.
+
 ## Testing & CI
 
 Unit and component smoke tests use Vitest + React Testing Library:

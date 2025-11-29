@@ -70,6 +70,25 @@ export async function getBatchesForClient(
   return (data ?? []) as unknown as BatchRow[];
 }
 
+export async function getBatchById(
+  organisationId: string,
+  batchId: string
+): Promise<BatchRow | null> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("batches")
+    .select(BATCH_COLUMNS)
+    .eq("organisation_id", organisationId)
+    .eq("id", batchId)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    throw new Error(error.message);
+  }
+
+  return (data ?? null) as BatchRow | null;
+}
+
 export async function updateBatchStatus(
   organisationId: string,
   batchId: string,

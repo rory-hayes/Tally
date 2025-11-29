@@ -25,7 +25,7 @@ export default function ClientsPage() {
   );
 }
 
-function ClientsManager() {
+export function ClientsManager() {
   const { organisationId } = useOrganisation();
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(false);

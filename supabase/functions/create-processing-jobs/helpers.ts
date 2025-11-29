@@ -48,7 +48,7 @@ export function buildProcessingJobRows({
       client_id: clientId,
       batch_id: batchId,
       storage_path: storagePath,
-      status: "processing",
+      status: "pending",
     });
   }
 

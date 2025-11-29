@@ -16,11 +16,11 @@ describe("buildProcessingJobRows", () => {
         client_id: "client-1",
         batch_id: "batch-1",
         storage_path: "batches/batch-1/file-a.pdf",
-        status: "processing",
+        status: "pending",
       }),
       expect.objectContaining({
         storage_path: "batches/batch-1/file-b.pdf",
-        status: "processing",
+        status: "pending",
       }),
     ]);
   });

@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { useOrganisation } from "@/context/OrganisationContext";
+import { getClientsForOrg, type ClientRow } from "@/lib/repositories/clients";
 
-export type ClientRecord = {
-  id: string;
-  name: string;
-  country: string | null;
-  payroll_system: string | null;
-};
+export type ClientRecord = ClientRow;
 
 export type ClientsHookState =
   | { status: "idle"; data: ClientRecord[]; error: null }
@@ -22,30 +18,30 @@ export function useClients(): ClientsHookState {
     data: [],
     error: null,
   });
+  const { organisationId } = useOrganisation();
 
   useEffect(() => {
     let active = true;
     async function fetchClients() {
       setState({ status: "loading", data: [], error: null });
 
-      const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name, country, payroll_system")
-        .order("name", { ascending: true });
+      try {
+        const clients = await getClientsForOrg(organisationId);
+        if (!active) return;
 
-      if (!active) return;
-
-      if (error) {
-        setState({ status: "error", data: [], error: error.message });
-        return;
+        setState({
+          status: "success",
+          data: clients,
+          error: null,
+        });
+      } catch (err) {
+        if (!active) return;
+        setState({
+          status: "error",
+          data: [],
+          error: err instanceof Error ? err.message : "Failed to load clients",
+        });
       }
-
-      setState({
-        status: "success",
-        data: data ?? [],
-        error: null,
-      });
     }
 
     fetchClients();
@@ -53,7 +49,7 @@ export function useClients(): ClientsHookState {
     return () => {
       active = false;
     };
-  }, []);
+  }, [organisationId]);
 
   return state;
 }

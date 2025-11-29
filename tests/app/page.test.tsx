@@ -5,6 +5,10 @@ vi.mock("@/components/auth/RequireAuth", () => ({
   RequireAuth: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock("@/hooks/useClients", () => ({
+  useClients: () => ({ status: "success", data: [], error: null }),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     replace: vi.fn(),

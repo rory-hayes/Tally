@@ -12,14 +12,16 @@ Open [http://localhost:3000](http://localhost:3000) to see the default page. Edi
 
 ## Supabase Configuration
 
-Create an `.env.local` file with the publishable credentials for the Tally Supabase project:
+Copy `env.example` to `.env.local` (or `.env`) and drop in the publishable credentials for the Tally Supabase project:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://jqixmhtgpabvaqdegvdn.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<sb_publishable_... key>
+# Optional legacy fallback if publishable keys are disabled
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<legacy anon key>
 ```
 
-The anon key (see Supabase dashboard) is safe to use in the browser. `lib/supabaseClient.ts` exposes helpers for browser/server clients, and `ClientsPreview` + `useClients` demonstrate querying the `clients` table directly from the dashboard page.
+`lib/supabaseClient.ts` prefers the publishable key (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) but will fall back to the legacy anon key if provided. Both values are safe to expose in the browser. `ClientsPreview` + `useClients` demonstrate querying the `clients` table directly from the dashboard page.
 
 ## Testing & CI
 

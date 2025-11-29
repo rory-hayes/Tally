@@ -1,4 +1,12 @@
 import { render, screen, act } from "@testing-library/react";
+import { vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+  }),
+}));
+
 import AppLayout from "@/components/layout/AppLayout";
 
 const renderLayout = async () => {

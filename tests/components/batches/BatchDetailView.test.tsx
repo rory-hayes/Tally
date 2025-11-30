@@ -31,6 +31,15 @@ vi.mock("@/lib/functions/downloadBatchIssuesCsv", () => ({
   downloadBatchIssuesCsv: (...args: unknown[]) => downloadCsvMock(...args),
 }));
 
+vi.mock("@/components/batches/BatchReportModal", () => ({
+  BatchReportModal: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="batch-report-modal">
+        <button onClick={onClose}>Close report</button>
+      </div>
+    ) : null,
+}));
+
 vi.mock("next/link", () => ({
   __esModule: true,
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -102,8 +111,14 @@ describe("BatchDetailView", () => {
 
   it("triggers CSV download when button clicked", async () => {
     render(<BatchDetailView batchId="batch-1" />);
-    fireEvent.click(screen.getByRole("button", { name: /download issues csv/i }));
+    fireEvent.click(screen.getByRole("button", { name: /download csv/i }));
     await waitFor(() => expect(downloadCsvMock).toHaveBeenCalledWith("batch-1"));
+  });
+
+  it("opens the printable report modal", async () => {
+    render(<BatchDetailView batchId="batch-1" />);
+    fireEvent.click(screen.getByRole("button", { name: /view report/i }));
+    expect(screen.getByTestId("batch-report-modal")).toBeInTheDocument();
   });
 });
 

@@ -23,6 +23,7 @@ import { updateBatchStatus } from "@/lib/repositories/batches";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
 import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
 import { downloadBatchIssuesCsv } from "@/lib/functions/downloadBatchIssuesCsv";
+import { BatchReportModal } from "@/components/batches/BatchReportModal";
 
 type BatchDetailViewProps = {
   batchId: string;
@@ -40,6 +41,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
 
   const batch = data?.batch ?? null;
 
@@ -181,9 +183,12 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
       <Card
         extra={
-          <Button onClick={handleExportCsv} loading={exporting}>
-            Download issues CSV
-          </Button>
+          <Space>
+            <Button onClick={handleExportCsv} loading={exporting}>
+              Download CSV
+            </Button>
+            <Button onClick={() => setReportVisible(true)}>View report</Button>
+          </Space>
         }
       >
         <Typography.Title level={4} style={{ marginBottom: 0 }}>
@@ -258,6 +263,14 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
           </Button>
         </Space>
       </Card>
+
+      <BatchReportModal
+        open={reportVisible}
+        onClose={() => setReportVisible(false)}
+        batch={batch}
+        totals={data.totals}
+        employees={data.employees}
+      />
     </Space>
   );
 }

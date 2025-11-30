@@ -8,6 +8,7 @@ import {
   buildBatchUpdatePayload,
   buildPayslipInsert,
   deriveIdentifierFromPath,
+  ensureNormalizedHasContent,
   listMissingFields,
   normalizeTextractResponse,
 } from "./helpers.ts";
@@ -142,6 +143,7 @@ async function handleJob(
     console.log(`[process_batch] Textract call finished for ${job.id}`);
 
     const normalized = normalizeTextractResponse(rawOcr);
+    ensureNormalizedHasContent(normalized);
     console.log(`[process_batch] Normalised response for ${job.id}`);
     const missingFields = listMissingFields(normalized);
     if (missingFields.length) {

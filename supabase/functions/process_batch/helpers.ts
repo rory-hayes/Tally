@@ -100,6 +100,14 @@ export const normalizeTextractResponse = (
   };
 };
 
+export const ensureNormalizedHasContent = (
+  normalized: NormalizedTextractResult
+) => {
+  if (!normalized.raw_text.trim().length) {
+    throw new Error("OCR result did not contain any text");
+  }
+};
+
 export const deriveIdentifierFromPath = (storagePath: string) => {
   const fileName = storagePath.split("/").pop() ?? "payslip.pdf";
   const match = fileName.match(/(EMP[\w\d]+)/i);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildPayslipInsert,
+  ensureNormalizedHasContent,
   listMissingFields,
   normalizeTextractResponse,
 } from "@/supabase/functions/process_batch/helpers";
@@ -58,11 +59,34 @@ describe("buildPayslipInsert", () => {
 
     const payload = buildPayslipInsert(job, "employee-1", normalized);
 
-    expect(payload.gross_pay).toBe(3000);
-    expect(payload.net_pay).toBe(2115);
-    expect(payload.pension_employee).toBe(150);
-    expect(payload.storage_path).toBe(job.storage_path);
+    expect(payload).toMatchObject({
+      organisation_id: job.organisation_id,
+      client_id: job.client_id,
+      batch_id: job.batch_id,
+      employee_id: "employee-1",
+      gross_pay: 3000,
+      net_pay: 2115,
+      paye: 600,
+      usc_or_ni: 135.5,
+      pension_employee: 150,
+      pension_employer: 180,
+      storage_path: job.storage_path,
+    });
     expect(payload.raw_ocr_json.raw_text).toContain("Payslip");
+  });
+});
+
+describe("ensureNormalizedHasContent", () => {
+  it("does nothing when raw_text contains content", () => {
+    const normalized = normalizeTextractResponse(sampleResponse as any);
+    expect(() => ensureNormalizedHasContent(normalized)).not.toThrow();
+  });
+
+  it("throws when the OCR response is empty", () => {
+    const normalized = normalizeTextractResponse({ Blocks: [] } as any);
+    expect(() => ensureNormalizedHasContent(normalized)).toThrow(
+      "OCR result did not contain any text"
+    );
   });
 });
 

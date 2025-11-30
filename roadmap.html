@@ -912,6 +912,43 @@
 
   <details>
     <summary>
+      <input type="checkbox" /> M6.5 – Parse Textract payload into payslip fields
+      <span class="done-label">(structured OCR values)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Take the raw Textract response and map key numeric fields (gross/net pay, PAYE, USC/NI, pensions) into the structured payslip columns so downstream diffs and rules have real data.
+    </p>
+
+    <h4>Prompt for Cursor</h4>
+    <pre><code>// Goal: Extract numeric payslip values from Textract output and persist them.
+//
+// Requirements:
+// - Expand normalizeTextractResponse to parse lines/blocks and return gross_pay, net_pay, paye, usc_ni, pension_ee, pension_er (numbers).
+// - Update process_batch to use these parsed values when inserting payslips (instead of nulls).
+// - Handle missing/invalid numbers gracefully (leave null but log a warning).
+// - Keep raw_ocr_json storing the full normalized payload for reference.
+//
+// Definition of Done:
+// - Sample PDFs populate structured columns in payslips (gross/net/etc.).
+// - Logs show when fields cannot be parsed.
+// - Existing pipeline tests updated; new unit tests for the parsing helper.
+//
+// Tests:
+// - Unit tests for normalizeTextractResponse parsing representative Textract payloads.
+// - Integration test ensuring process_batch writes parsed numbers into payslips.
+    </code></pre>
+
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>Structured payslip columns populated from Textract where possible.</li>
+      <li>Graceful handling (null + log) when values cannot be parsed.</li>
+      <li>Tests updated/added to cover parsing logic.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
       <input type="checkbox" /> M6.4 – Tests: Pipeline & error handling
       <span class="done-label">(TDD checkpoint)</span>
     </summary>

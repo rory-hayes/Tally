@@ -2,6 +2,10 @@ import React from "react";
 import { vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+process.env.NEXT_PUBLIC_SUPABASE_URL ??= "https://example.supabase.co";
+process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??= "test-pk";
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "test-anon";
+
 type ImageProps = {
   src?: string | { src: string };
   alt?: string;
@@ -30,9 +34,15 @@ if (typeof window !== "undefined") {
     dispatchEvent: vi.fn(),
   }));
 
-  window.getComputedStyle = window.getComputedStyle ?? (() => ({
+  const computedStyleStub = (() => ({
     getPropertyValue: () => "",
+    display: "block",
   })) as typeof window.getComputedStyle;
+  window.getComputedStyle = computedStyleStub;
+  // Ensure document.defaultView (used by testing-library) shares the stub.
+  if (window.document?.defaultView) {
+    window.document.defaultView.getComputedStyle = computedStyleStub;
+  }
 }
 
 class ResizeObserverMock {

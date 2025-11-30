@@ -6,7 +6,9 @@ import {
 import {
   NormalizedTextractResult,
   buildBatchUpdatePayload,
+  buildPayslipInsert,
   deriveIdentifierFromPath,
+  listMissingFields,
   normalizeTextractResponse,
 } from "./helpers.ts";
 
@@ -141,6 +143,14 @@ async function handleJob(
 
     const normalized = normalizeTextractResponse(rawOcr);
     console.log(`[process_batch] Normalised response for ${job.id}`);
+    const missingFields = listMissingFields(normalized);
+    if (missingFields.length) {
+      console.warn(
+        `[process_batch] Missing numeric fields for job ${job.id}: ${missingFields.join(
+          ", "
+        )}`
+      );
+    }
 
     const employeeId = await resolveEmployee(supabase, job);
     await insertPayslip(supabase, job, employeeId, normalized);
@@ -223,21 +233,8 @@ async function insertPayslip(
   employeeId: string,
   normalized: NormalizedTextractResult
 ) {
-  const { error } = await supabase.from("payslips").insert({
-    organisation_id: job.organisation_id,
-    client_id: job.client_id,
-    batch_id: job.batch_id,
-    employee_id: employeeId,
-    pay_date: new Date().toISOString().slice(0, 10),
-    gross_pay: normalized.gross_pay,
-    net_pay: normalized.net_pay,
-    paye: normalized.paye,
-    usc_or_ni: normalized.usc_ni,
-    pension_employee: normalized.pension_ee,
-    pension_employer: normalized.pension_er,
-    raw_ocr_json: normalized,
-    storage_path: job.storage_path,
-  });
+  const payload = buildPayslipInsert(job, employeeId, normalized);
+  const { error } = await supabase.from("payslips").insert(payload);
 
   if (error) {
     throw new Error(error.message);

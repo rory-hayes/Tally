@@ -2,19 +2,23 @@
 
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-const edgeFunctionsBaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_EDGE_FUNCTIONS_URL ??
-  (supabaseUrl ? `${supabaseUrl}/functions/v1` : null);
-const functionUrl = edgeFunctionsBaseUrl
-  ? `${edgeFunctionsBaseUrl}/create-processing-jobs`
-  : null;
+
+const resolveFunctionUrl = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  const edgeFunctionsBaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_EDGE_FUNCTIONS_URL ??
+    (supabaseUrl ? `${supabaseUrl}/functions/v1` : null);
+  return edgeFunctionsBaseUrl
+    ? `${edgeFunctionsBaseUrl}/create-processing-jobs`
+    : null;
+};
 
 export const invokeCreateProcessingJobs = async (batchId: string) => {
   if (!batchId) {
     throw new Error("batchId is required");
   }
 
+  const functionUrl = resolveFunctionUrl();
   if (!functionUrl) {
     throw new Error(
       "Missing Supabase function endpoint. Set NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_EDGE_FUNCTIONS_URL."

@@ -1,0 +1,155 @@
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { calculateDiff, type PayslipLike, type PayslipDiff } from "@/lib/logic/payslipDiff";
+
+export type IssueSeverity = "critical" | "warning" | "info";
+
+export type IssueRow = {
+  id: string;
+  rule_code: string;
+  severity: IssueSeverity;
+  description: string;
+  resolved: boolean;
+  note: string | null;
+};
+
+export type EmployeeComparison = {
+  employeeId: string;
+  employeeName: string;
+  employeeRef: string | null;
+  batchId: string;
+  clientId: string;
+  currentPayslip: PayslipLike & { id: string; pay_date?: string | null };
+  previousPayslip: (PayslipLike & { id: string; pay_date?: string | null }) | null;
+  diff: PayslipDiff;
+  issues: IssueRow[];
+};
+
+type PayslipRecord = {
+  id: string;
+  organisation_id: string;
+  client_id: string;
+  employee_id: string;
+  batch_id: string;
+  pay_date?: string | null;
+  gross_pay?: number | null;
+  net_pay?: number | null;
+  paye?: number | null;
+  usc_or_ni?: number | null;
+  pension_employee?: number | null;
+  pension_employer?: number | null;
+  ytd_gross?: number | null;
+  ytd_net?: number | null;
+  ytd_tax?: number | null;
+  ytd_usc_or_ni?: number | null;
+  prsi_or_ni_category?: string | null;
+  employees: { name: string | null; external_employee_ref: string | null } | null;
+  issues: IssueRow[] | null;
+};
+
+export async function fetchEmployeeComparison(args: {
+  organisationId: string;
+  employeeId: string;
+  batchId: string;
+}): Promise<EmployeeComparison> {
+  const supabase = getSupabaseBrowserClient();
+  const { organisationId, employeeId, batchId } = args;
+
+  const { data: payslips, error } = await supabase
+    .from("payslips")
+    .select(
+      `
+        id,
+        organisation_id,
+        client_id,
+        employee_id,
+        batch_id,
+        pay_date,
+        gross_pay,
+        net_pay,
+        paye,
+        usc_or_ni,
+        pension_employee,
+        pension_employer,
+        ytd_gross,
+        ytd_net,
+        ytd_tax,
+        ytd_usc_or_ni,
+        prsi_or_ni_category,
+        employees:employees (
+          name,
+          external_employee_ref
+        ),
+        issues:issues (
+          id,
+          rule_code,
+          severity,
+          description,
+          resolved,
+          note
+        )
+      `
+    )
+    .eq("organisation_id", organisationId)
+    .eq("employee_id", employeeId)
+    .order("pay_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const currentPayslip = (payslips ?? []).find((p) => p.batch_id === batchId);
+
+  if (!currentPayslip) {
+    throw new Error("Payslip not found for employee in this batch");
+  }
+
+  const previousPayslip = (payslips ?? []).find((p) => p.batch_id !== batchId) ?? null;
+  const employeeName =
+    currentPayslip.employees && !Array.isArray(currentPayslip.employees)
+      ? (currentPayslip.employees as PayslipRecord["employees"])?.name ?? "Employee"
+      : "Employee";
+  const employeeRef =
+    currentPayslip.employees && !Array.isArray(currentPayslip.employees)
+      ? (currentPayslip.employees as PayslipRecord["employees"])?.external_employee_ref ?? null
+      : null;
+
+  const diff = calculateDiff(
+    (previousPayslip as PayslipLike | null | undefined),
+    currentPayslip as PayslipLike
+  );
+
+  return {
+    employeeId,
+    employeeName,
+    employeeRef,
+    batchId,
+    clientId: currentPayslip.client_id,
+    currentPayslip,
+    previousPayslip,
+    diff,
+    issues: (currentPayslip.issues ?? []) as IssueRow[],
+  };
+}
+
+export async function updateIssueResolution(args: {
+  issueId: string;
+  resolved: boolean;
+  note?: string | null;
+}) {
+  const supabase = getSupabaseBrowserClient();
+  const { issueId, resolved, note } = args;
+  const { error } = await supabase
+    .from("issues")
+    .update({
+      resolved,
+      note: note ?? null,
+      resolved_at: resolved ? new Date().toISOString() : null,
+    })
+    .eq("id", issueId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+

@@ -144,13 +144,15 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       ),
     })),
     {
-      title: "Action",
-      key: "action",
-      render: (_: unknown, record: (typeof data.employees)[number]) => (
-        <Link href={`/clients/${batch.client_id}?employee=${record.employeeId}`}>
-          View
-        </Link>
-      ),
+        title: "Action",
+        key: "action",
+        render: (_: unknown, record: (typeof data.employees)[number]) => (
+          <Link
+            href={`/clients/${batch.client_id}/employees/${record.employeeId}?batchId=${batch.id}`}
+          >
+            View
+          </Link>
+        ),
     },
   ];
 

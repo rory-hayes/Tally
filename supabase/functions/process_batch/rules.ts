@@ -74,27 +74,27 @@ const RULE_DEFINITIONS: Record<
   NET_CHANGE_LARGE: {
     severity: "warning",
     description: ({ previous, current, percentChange }) =>
-      `Net pay changed by ${formatPercent(percentChange)} (${formatAmount(
-        previous as number | null
-      )} → ${formatAmount(current as number | null)})`,
+      `Net pay changed by ${formatPercent(percentChange as number | null | undefined)} (${formatAmount(
+        previous as number | null | undefined
+      )} → ${formatAmount(current as number | null | undefined)})`,
   },
   GROSS_CHANGE_LARGE: {
     severity: "warning",
     description: ({ previous, current, percentChange }) =>
-      `Gross pay changed by ${formatPercent(percentChange)} (${formatAmount(
-        previous as number | null
-      )} → ${formatAmount(current as number | null)})`,
+      `Gross pay changed by ${formatPercent(percentChange as number | null | undefined)} (${formatAmount(
+        previous as number | null | undefined
+      )} → ${formatAmount(current as number | null | undefined)})`,
   },
   TAX_SPIKE_WITHOUT_GROSS: {
     severity: "warning",
     description: ({ percentChange }) =>
-      `PAYE increased by ${formatPercent(percentChange)} while gross pay stayed flat`,
+      `PAYE increased by ${formatPercent(percentChange as number | null | undefined)} while gross pay stayed flat`,
   },
   YTD_REGRESSION: {
     severity: "critical",
     description: ({ fieldLabel, previous, current }) =>
-      `${fieldLabel ?? "YTD value"} decreased (${formatAmount(previous as number | null)} → ${formatAmount(
-        current as number | null
+      `${fieldLabel ?? "YTD value"} decreased (${formatAmount(previous as number | null | undefined)} → ${formatAmount(
+        current as number | null | undefined
       )})`,
   },
   PRSI_CATEGORY_CHANGE: {
@@ -104,12 +104,12 @@ const RULE_DEFINITIONS: Record<
   PENSION_EMPLOYEE_HIGH: {
     severity: "warning",
     description: ({ percentChange }) =>
-      `Employee pension contribution is ${formatPercent(percentChange)} of gross pay`,
+      `Employee pension contribution is ${formatPercent(percentChange as number | null | undefined)} of gross pay`,
   },
   PENSION_EMPLOYER_HIGH: {
     severity: "info",
     description: ({ percentChange }) =>
-      `Employer pension contribution is ${formatPercent(percentChange)} of gross pay`,
+      `Employer pension contribution is ${formatPercent(percentChange as number | null | undefined)} of gross pay`,
   },
 };
 

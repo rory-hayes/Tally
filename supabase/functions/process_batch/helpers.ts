@@ -1,4 +1,11 @@
-import type { DetectDocumentTextCommandOutput } from "npm:@aws-sdk/client-textract";
+type TextractBlock = {
+  BlockType?: string;
+  Text?: string | null;
+};
+
+type TextractResponse = {
+  Blocks?: TextractBlock[] | null;
+};
 
 export type NormalizedTextractResult = {
   raw_text: string;
@@ -62,7 +69,7 @@ const findAmount = (lines: string[], field: NumericField) => {
 };
 
 export const normalizeTextractResponse = (
-  response: DetectDocumentTextCommandOutput | null | undefined
+  response: TextractResponse | null | undefined
 ): NormalizedTextractResult => {
   const blocks = Array.isArray(response?.Blocks) ? response?.Blocks : [];
   const lines = blocks

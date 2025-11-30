@@ -34,10 +34,11 @@ if (typeof window !== "undefined") {
     dispatchEvent: vi.fn(),
   }));
 
-  const computedStyleStub = (() => ({
-    getPropertyValue: () => "",
-    display: "block",
-  })) as typeof window.getComputedStyle;
+  const computedStyleStub: typeof window.getComputedStyle = () =>
+    ({
+      getPropertyValue: () => "",
+      display: "block",
+    } as unknown as CSSStyleDeclaration);
   window.getComputedStyle = computedStyleStub;
   // Ensure document.defaultView (used by testing-library) shares the stub.
   if (window.document?.defaultView) {

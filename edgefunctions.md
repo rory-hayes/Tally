@@ -12,13 +12,13 @@ This document tracks the Supabase Edge Functions that backoffice services rely o
   - Updates `batches.status` to `processing`.
   - Returns `{ created: number }`.
 
-## `process-ocr-jobs`
-- **Location**: `supabase/functions/process-ocr-jobs/index.ts`
-- **Purpose**: Cron-triggered worker that picks up pending jobs, downloads each PDF, runs OCR, normalises the result, inserts payslips, and advances batch state.
-- **Inputs**: No body required; invoked on a schedule with service role credentials. Optional env vars: `JOB_PROCESSOR_BATCH_SIZE`, `OCR_API_URL`, `OCR_API_KEY`.
+## `process_batch`
+- **Location**: `supabase/functions/process_batch/index.ts`
+- **Purpose**: Cron-triggered worker that picks up pending jobs, downloads each PDF, runs AWS Textract OCR, normalises the result, inserts placeholder payslips/issues, and advances batch state.
+- **Inputs**: No body required; invoked on a schedule with service role credentials. Env vars: `JOB_PROCESSOR_BATCH_SIZE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
 - **Side Effects**:
   - Selects `processing_jobs` with `status = 'pending'`, marks them `processing`, and processes up to `JOB_PROCESSOR_BATCH_SIZE`.
-  - Downloads each file from Storage, calls the OCR endpoint (or stub), normalises output, upserts employees, and inserts rows into `payslips`.
+  - Downloads each file from Storage, calls AWS Textract, normalises output (see `normalizeTextractResponse`), upserts employees, inserts rows into `payslips`, and logs informational `issues`.
   - Updates `processing_jobs.status` to `completed`/`failed` and increments `batches.processed_files`, marking batches `completed` when all files are handled.
   - Returns a summary `{ processed, completed, failed }`.
 

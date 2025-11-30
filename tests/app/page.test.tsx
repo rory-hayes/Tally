@@ -5,8 +5,8 @@ vi.mock("@/components/auth/RequireAuth", () => ({
   RequireAuth: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/hooks/useClients", () => ({
-  useClients: () => ({ status: "success", data: [], error: null }),
+vi.mock("@/components/dashboard/DashboardView", () => ({
+  DashboardView: () => <div data-testid="dashboard-view-mock">Dashboard</div>,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -19,14 +19,12 @@ vi.mock("next/navigation", () => ({
 import Home from "@/app/page";
 
 describe("Home page", () => {
-  it("shows the Tally dashboard heading", async () => {
+  it("renders the dashboard view", async () => {
     await act(async () => {
       render(<Home />);
     });
 
-    expect(
-      screen.getByRole("heading", { name: /tally dashboard/i })
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-view-mock")).toBeInTheDocument();
   });
 });
 

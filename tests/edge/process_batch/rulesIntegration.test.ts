@@ -20,25 +20,45 @@ const basePayslip = {
   prsi_or_ni_category: "A1",
 };
 
-describe("buildIssuesForPayslip", () => {
-  it("generates issue rows when rules fire", () => {
-    const previous = { ...basePayslip, id: "prev", net_pay: 1500 };
-    const current = { ...basePayslip, net_pay: 2500 };
+const capture = (overrides: Partial<typeof basePayslip>, prevOverrides?: Partial<typeof basePayslip>) => {
+  const previous = { ...basePayslip, id: "prev", ...prevOverrides };
+  const current = { ...basePayslip, ...overrides };
+  return buildIssuesForPayslip(current, previous);
+};
 
-    const issues = buildIssuesForPayslip(current, previous);
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({
-      payslip_id: "current",
-      employee_id: "emp",
-      rule_code: "NET_CHANGE_LARGE",
-    });
+describe("buildIssuesForPayslip", () => {
+  it("generates issue rows for large net change", () => {
+    const issues = capture({ net_pay: 2600 }, { net_pay: 2000 });
+    expect(issues.map((issue) => issue.rule_code)).toContain("NET_CHANGE_LARGE");
   });
 
-  it("handles missing previous payslip gracefully", () => {
-    const current = { ...basePayslip, gross_pay: 2000, pension_employee: 400 };
+  it("flags large gross pay shifts", () => {
+    const issues = capture({ gross_pay: 3900 }, { gross_pay: 3000 });
+    expect(issues.map((issue) => issue.rule_code)).toContain("GROSS_CHANGE_LARGE");
+  });
 
+  it("detects tax spike without gross change", () => {
+    const issues = capture({ paye: 900 }, { paye: 600, gross_pay: 3000 });
+    expect(issues.map((issue) => issue.rule_code)).toContain("TAX_SPIKE_WITHOUT_GROSS");
+  });
+
+  it("surfaces YTD regressions", () => {
+    const issues = capture({ ytd_net: 10000 }, { ytd_net: 12000 });
+    expect(issues.map((issue) => issue.rule_code)).toContain("YTD_REGRESSION");
+  });
+
+  it("detects PRSI/NI category changes", () => {
+    const current = { ...basePayslip, prsi_or_ni_category: "B1" };
+    const issues = buildIssuesForPayslip(current, { ...basePayslip, id: "prev", prsi_or_ni_category: "A1" });
+    expect(issues.map((issue) => issue.rule_code)).toContain("PRSI_CATEGORY_CHANGE");
+  });
+
+  it("flags high pension percentages even when no previous payslip", () => {
+    const current = { ...basePayslip, gross_pay: 2000, pension_employee: 400, pension_employer: 350 };
     const issues = buildIssuesForPayslip(current, null);
-    expect(issues.map((issue) => issue.rule_code)).toContain("PENSION_EMPLOYEE_HIGH");
+    expect(issues.map((issue) => issue.rule_code)).toEqual(
+      expect.arrayContaining(["PENSION_EMPLOYEE_HIGH", "PENSION_EMPLOYER_HIGH"])
+    );
   });
 
   it("returns empty array when no rules triggered", () => {

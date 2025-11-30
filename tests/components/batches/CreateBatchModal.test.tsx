@@ -43,9 +43,10 @@ describe("CreateBatchModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /create batch/i }));
 
-    expect(
-      await screen.findByText(/enter the payroll period label/i)
-    ).toBeInTheDocument();
+    const field = screen.getByLabelText(/payroll period/i);
+    await waitFor(() =>
+      expect(field).toHaveAttribute("aria-invalid", "true")
+    );
     expect(handleSubmit).not.toHaveBeenCalled();
   });
 });

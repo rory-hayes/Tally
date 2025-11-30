@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BatchRow } from "@/lib/repositories/batches";
 import { batchFixture } from "@/tests/fixtures/batches";
 import { clientFixture } from "@/tests/fixtures/clients";
-import { BatchUploadContent } from "@/app/batches/[batchId]/page";
 
 const repoMocks = vi.hoisted(() => ({
   getClientById: vi.fn(),
@@ -142,7 +141,7 @@ describe("ClientDetailContent", () => {
     expect(mockRouter.push).toHaveBeenCalledWith(`/batches/${batchFixture.id}`);
   });
 
-  it("navigates to batch upload flow after creation", async () => {
+  it("navigates to batch detail after creation", async () => {
     repoMocks.createBatchForClient.mockResolvedValue({ ...batchFixture });
     render(<ClientDetailContent clientId={clientFixture.id} />);
 
@@ -158,11 +157,6 @@ describe("ClientDetailContent", () => {
         `/batches/${batchFixture.id}`
       )
     );
-
-    repoMocks.getBatchById.mockResolvedValue({ ...batchFixture });
-    render(<BatchUploadContent batchId={batchFixture.id} />);
-
-    expect(await screen.findByText(/Batch upload/i)).toBeInTheDocument();
   });
 });
 

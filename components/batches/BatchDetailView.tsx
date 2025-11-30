@@ -1,0 +1,237 @@
+"use client";
+
+import Link from "next/link";
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+  Upload,
+  message,
+} from "antd";
+import { useMemo, useState } from "react";
+import type { UploadFile, RcFile } from "antd/es/upload/interface";
+import { useOrganisation } from "@/context/OrganisationContext";
+import { useBatchDetail } from "@/hooks/useBatchDetail";
+import type { IssueSeverity } from "@/lib/repositories/batchDetails";
+import { updateBatchStatus } from "@/lib/repositories/batches";
+import { uploadBatchFiles } from "@/lib/storage/batchUploads";
+import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
+
+type BatchDetailViewProps = {
+  batchId: string;
+};
+
+const severityColors: Record<IssueSeverity, string> = {
+  critical: "red",
+  warning: "orange",
+  info: "blue",
+};
+
+export function BatchDetailView({ batchId }: BatchDetailViewProps) {
+  const { organisationId } = useOrganisation();
+  const { status, data, error, refresh } = useBatchDetail(batchId);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const batch = data?.batch ?? null;
+
+  const draggerProps = useMemo(
+    () => ({
+      multiple: true,
+      accept: ".pdf,.PDF",
+      fileList,
+      onRemove: (file: UploadFile) => {
+        setFileList((prev) => prev.filter((item) => item.uid !== file.uid));
+      },
+      onChange: (info: { fileList: UploadFile[] }) => {
+        setFileList(info.fileList);
+      },
+      beforeUpload: (file: RcFile) => {
+        const uploadFile: UploadFile = {
+          uid: file.uid,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          originFileObj: file,
+        };
+        setFileList((prev) => [...prev, uploadFile]);
+        return false;
+      },
+    }),
+    [fileList]
+  );
+
+  const handleUpload = async () => {
+    if (!batch || fileList.length === 0) {
+      message.warning("Select at least one file to upload.");
+      return;
+    }
+
+    const rcFiles = fileList
+      .map((file) => file.originFileObj)
+      .filter((file): file is RcFile => !!file);
+    const files = rcFiles.map((file) => file as File);
+
+    if (!files.length) {
+      message.warning("Unable to read selected files.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      await uploadBatchFiles(batch.id, files);
+      await updateBatchStatus(organisationId, batch.id, {
+        total_files: (batch.total_files ?? 0) + files.length,
+      });
+      await invokeCreateProcessingJobs(batch.id);
+      message.success("Files uploaded and queued for processing.");
+      setFileList([]);
+      await refresh();
+    } catch (err) {
+      message.error(
+        err instanceof Error
+          ? err.message
+          : "Upload failed. Please try again later."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (status === "loading" || status === "idle") {
+    return (
+      <div style={{ minHeight: "50vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <Spin />
+      </div>
+    );
+  }
+
+  if (status === "error" || !data || !batch) {
+    return (
+      <Alert
+        type="error"
+        message="Unable to load batch details"
+        description={error ?? "Try reloading the page."}
+        showIcon
+      />
+    );
+  }
+
+  const columns = [
+    {
+      title: "Employee",
+      dataIndex: "employeeName",
+      key: "employeeName",
+    },
+    {
+      title: "Reference",
+      dataIndex: "employeeRef",
+      key: "employeeRef",
+      render: (value: string | null) => value ?? "—",
+    },
+    ...(["critical", "warning", "info"] as IssueSeverity[]).map((level) => ({
+      title: level.charAt(0).toUpperCase() + level.slice(1),
+      dataIndex: ["issues", level],
+      key: level,
+      render: (value: number, record: (typeof data.employees)[number]) => (
+        <Tag color={severityColors[level]}>{record.issues[level]}</Tag>
+      ),
+    })),
+    {
+      title: "Action",
+      key: "action",
+      render: (_: unknown, record: (typeof data.employees)[number]) => (
+        <Link href={`/clients/${batch.client_id}?employee=${record.employeeId}`}>
+          View
+        </Link>
+      ),
+    },
+  ];
+
+  const createdAt = new Date(batch.created_at).toLocaleString();
+
+  return (
+    <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+      <Card>
+        <Typography.Title level={4} style={{ marginBottom: 0 }}>
+          Batch overview
+        </Typography.Title>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          Period: <strong>{batch.period_label}</strong>
+        </Typography.Paragraph>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          Status:{" "}
+          <Tag color={batch.status === "completed" ? "green" : "gold"}>
+            {batch.status}
+          </Tag>
+        </Typography.Paragraph>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          Created: {createdAt}
+        </Typography.Paragraph>
+      </Card>
+
+      <Space orientation="horizontal" size="large" wrap>
+        <Card style={{ minWidth: 200 }}>
+          <Typography.Text type="secondary">Employees processed</Typography.Text>
+          <Typography.Title level={3}>
+            {data.totals.employeesProcessed}
+          </Typography.Title>
+        </Card>
+        <Card style={{ minWidth: 200 }}>
+          <Typography.Text type="secondary">Critical issues</Typography.Text>
+          <Typography.Title level={3} style={{ color: severityColors.critical }}>
+            {data.totals.critical}
+          </Typography.Title>
+        </Card>
+        <Card style={{ minWidth: 200 }}>
+          <Typography.Text type="secondary">Warnings</Typography.Text>
+          <Typography.Title level={3} style={{ color: severityColors.warning }}>
+            {data.totals.warning}
+          </Typography.Title>
+        </Card>
+      </Space>
+
+      <Card title="Employee issues">
+        {data.employees.length === 0 ? (
+          <Empty description="No employees processed yet." />
+        ) : (
+          <Table
+            rowKey="employeeId"
+            dataSource={data.employees}
+            columns={columns}
+            pagination={false}
+          />
+        )}
+      </Card>
+
+      <Card title="Upload payslips">
+        <Upload.Dragger {...draggerProps} style={{ marginBottom: 16 }}>
+          <p className="ant-upload-drag-icon">Drop PDFs here or click to add</p>
+          <p className="ant-upload-text">
+            Upload payslip PDFs for this batch. Files are stored securely.
+          </p>
+        </Upload.Dragger>
+        <Space>
+          <Button onClick={() => setFileList([])} disabled={fileList.length === 0 || uploading}>
+            Clear selection
+          </Button>
+          <Button
+            type="primary"
+            onClick={handleUpload}
+            loading={uploading}
+            disabled={uploading || fileList.length === 0}
+          >
+            Upload files
+          </Button>
+        </Space>
+      </Card>
+    </Space>
+  );
+}
+

@@ -40,5 +40,30 @@ describe("buildBatchIssuesCsv", () => {
       '"Bob ""The Builder""","EMP,002",YTD_REGRESSION,critical,"YTD tax decreased\nCheck payroll data",'
     );
   });
+
+  it("serialises multiple issues preserving order", () => {
+    const csv = buildBatchIssuesCsv([
+      {
+        employeeName: "Alice",
+        employeeRef: "EMP-001",
+        ruleCode: "NET_CHANGE",
+        severity: "warning",
+        description: "Net pay changed",
+        values: "Δ€100",
+      },
+      {
+        employeeName: "Bob",
+        employeeRef: "EMP-002",
+        ruleCode: "YTD_REGRESSION",
+        severity: "critical",
+        description: "YTD net decreased",
+        values: "",
+      },
+    ]);
+
+    const lines = csv.split("\r\n");
+    expect(lines[1]).toBe("Alice,EMP-001,NET_CHANGE,warning,Net pay changed,Δ€100");
+    expect(lines[2]).toBe("Bob,EMP-002,YTD_REGRESSION,critical,YTD net decreased,");
+  });
 });
 

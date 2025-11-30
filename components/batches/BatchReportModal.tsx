@@ -91,13 +91,17 @@ export function BatchReportModal({
           <SummaryCard label="Info" value={totals.info} />
         </Space>
 
-        <Table<EmployeeIssueSummary>
-          dataSource={employees}
-          columns={columns}
-          rowKey="employeeId"
-          pagination={false}
-          size="small"
-        />
+        {employees.length === 0 ? (
+          <Typography.Text type="secondary">No issues found for this batch.</Typography.Text>
+        ) : (
+          <Table<EmployeeIssueSummary>
+            dataSource={employees}
+            columns={columns}
+            rowKey="employeeId"
+            pagination={false}
+            size="small"
+          />
+        )}
       </Space>
     </Modal>
   );

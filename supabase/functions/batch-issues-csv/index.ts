@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.1";
-import { buildBatchIssuesCsv, type BatchIssueCsvRow } from "../../../lib/logic/batchIssuesCsv.ts";
+import { buildBatchIssuesCsv, type BatchIssueCsvRow } from "./csv.ts";
 
 const SUPABASE_URL =
   Deno.env.get("PROJECT_URL") ??

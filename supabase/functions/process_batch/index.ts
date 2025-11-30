@@ -12,6 +12,11 @@ import {
   listMissingFields,
   normalizeTextractResponse,
 } from "./helpers.ts";
+import {
+  PAYSLIP_SELECT_FIELDS,
+  buildIssuesForPayslip,
+  type PayslipForRules,
+} from "./rules.ts";
 
 type JobRow = {
   id: string;
@@ -155,8 +160,10 @@ async function handleJob(
     }
 
     const employeeId = await resolveEmployee(supabase, job);
-    await insertPayslip(supabase, job, employeeId, normalized);
+    const previousPayslip = await fetchPreviousPayslip(supabase, job, employeeId);
+    const currentPayslip = await insertPayslip(supabase, job, employeeId, normalized);
     await insertInfoIssue(supabase, job, employeeId, normalized);
+    await insertRuleIssues(supabase, currentPayslip, previousPayslip);
     await markJobStatus(supabase, job.id, true);
     await updateBatchProgress(supabase, job.batch_id);
 
@@ -236,11 +243,17 @@ async function insertPayslip(
   normalized: NormalizedTextractResult
 ) {
   const payload = buildPayslipInsert(job, employeeId, normalized);
-  const { error } = await supabase.from("payslips").insert(payload);
+  const { data, error } = await supabase
+    .from("payslips")
+    .insert(payload)
+    .select(PAYSLIP_SELECT_FIELDS)
+    .single();
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !data) {
+    throw new Error(error?.message ?? "Unable to insert payslip");
   }
+
+  return data as PayslipForRules;
 }
 
 async function insertInfoIssue(
@@ -259,6 +272,42 @@ async function insertInfoIssue(
     description: `OCR ingestion captured ${normalized.raw_text.length} characters`,
     note: null,
   });
+}
+
+async function fetchPreviousPayslip(
+  supabase: ReturnType<typeof createClient>,
+  job: JobRow,
+  employeeId: string
+) {
+  const { data, error } = await supabase
+    .from("payslips")
+    .select(PAYSLIP_SELECT_FIELDS)
+    .eq("organisation_id", job.organisation_id)
+    .eq("client_id", job.client_id)
+    .eq("employee_id", employeeId)
+    .order("pay_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as PayslipForRules) ?? null;
+}
+
+async function insertRuleIssues(
+  supabase: ReturnType<typeof createClient>,
+  currentPayslip: PayslipForRules,
+  previousPayslip: PayslipForRules | null
+) {
+  const rows = buildIssuesForPayslip(currentPayslip, previousPayslip);
+  if (!rows.length) return;
+  const { error } = await supabase.from("issues").insert(rows);
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 async function markJobStatus(

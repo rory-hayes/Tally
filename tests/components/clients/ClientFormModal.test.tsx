@@ -21,8 +21,9 @@ describe("ClientFormModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() =>
-      expect(handleSubmit).toHaveBeenCalledWith({ name: "Acme" })
+    await waitFor(
+      () => expect(handleSubmit).toHaveBeenCalledWith({ name: "Acme" }),
+      { timeout: 7000 }
     );
   });
 

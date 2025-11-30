@@ -1,3 +1,4 @@
+import React from "react";
 import { render, screen } from "@testing-library/react";
 import { vi, describe, it, beforeEach } from "vitest";
 import { BatchDetailView } from "@/components/batches/BatchDetailView";
@@ -22,6 +23,13 @@ vi.mock("@/lib/storage/batchUploads", () => ({
 
 vi.mock("@/lib/functions/createProcessingJobs", () => ({
   invokeCreateProcessingJobs: vi.fn(),
+}));
+
+vi.mock("next/link", () => ({
+  __esModule: true,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 const sampleDetail = {
@@ -75,6 +83,15 @@ describe("BatchDetailView", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("EMP001")).toBeInTheDocument();
     expect(screen.getByText("View")).toBeInTheDocument();
+  });
+
+  it("links employees to the employee detail view", () => {
+    render(<BatchDetailView batchId="batch-1" />);
+    const link = screen.getByRole("link", { name: /view/i });
+    expect(link).toHaveAttribute(
+      "href",
+      "/clients/client-1/employees/emp-1?batchId=batch-1"
+    );
   });
 });
 

@@ -1,3 +1,4 @@
+import React from "react";
 import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import { DashboardView } from "@/components/dashboard/DashboardView";
@@ -6,6 +7,13 @@ const mockUseDashboardSummary = vi.fn();
 
 vi.mock("@/hooks/useDashboardSummary", () => ({
   useDashboardSummary: () => mockUseDashboardSummary(),
+}));
+
+vi.mock("next/link", () => ({
+  __esModule: true,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 const sampleData = [
@@ -48,6 +56,18 @@ describe("DashboardView", () => {
     expect(screen.getByTestId("critical-count")).toHaveTextContent("2");
     expect(screen.getByTestId("warning-count")).toHaveTextContent("3");
     expect(screen.getByTestId("info-count")).toHaveTextContent("5");
+  });
+
+  it("links each client to the detail page", () => {
+    mockUseDashboardSummary.mockReturnValue({
+      status: "success",
+      data: sampleData,
+      error: null,
+    });
+
+    render(<DashboardView />);
+    const link = screen.getByRole("link", { name: /acme ltd/i });
+    expect(link).toHaveAttribute("href", "/clients/client-1");
   });
 
   it("shows error message when loading fails", () => {

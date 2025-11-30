@@ -158,6 +158,18 @@ describe("ClientDetailContent", () => {
       )
     );
   });
+
+  it("opens an existing batch from the table", async () => {
+    repoMocks.getBatchesForClient.mockResolvedValue([{ ...batchFixture }]);
+
+    render(<ClientDetailContent clientId="client-123" />);
+
+    await screen.findByText(batchFixture.period_label);
+
+    fireEvent.click(screen.getByRole("button", { name: /open/i }));
+
+    expect(mockRouter.push).toHaveBeenCalledWith(`/batches/${batchFixture.id}`);
+  });
 });
 
 

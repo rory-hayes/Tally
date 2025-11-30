@@ -1,9 +1,11 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import React from "react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, beforeEach } from "vitest";
 import { BatchDetailView } from "@/components/batches/BatchDetailView";
 
 const mockUseBatchDetail = vi.fn();
+const downloadCsvMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/hooks/useBatchDetail", () => ({
   useBatchDetail: () => mockUseBatchDetail(),
@@ -23,6 +25,10 @@ vi.mock("@/lib/storage/batchUploads", () => ({
 
 vi.mock("@/lib/functions/createProcessingJobs", () => ({
   invokeCreateProcessingJobs: vi.fn(),
+}));
+
+vi.mock("@/lib/functions/downloadBatchIssuesCsv", () => ({
+  downloadBatchIssuesCsv: (...args: unknown[]) => downloadCsvMock(...args),
 }));
 
 vi.mock("next/link", () => ({
@@ -92,6 +98,12 @@ describe("BatchDetailView", () => {
       "href",
       "/clients/client-1/employees/emp-1?batchId=batch-1"
     );
+  });
+
+  it("triggers CSV download when button clicked", async () => {
+    render(<BatchDetailView batchId="batch-1" />);
+    fireEvent.click(screen.getByRole("button", { name: /download issues csv/i }));
+    await waitFor(() => expect(downloadCsvMock).toHaveBeenCalledWith("batch-1"));
   });
 });
 

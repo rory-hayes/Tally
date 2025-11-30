@@ -22,6 +22,7 @@ import type { IssueSeverity } from "@/lib/repositories/batchDetails";
 import { updateBatchStatus } from "@/lib/repositories/batches";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
 import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
+import { downloadBatchIssuesCsv } from "@/lib/functions/downloadBatchIssuesCsv";
 
 type BatchDetailViewProps = {
   batchId: string;
@@ -38,6 +39,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const { status, data, error, refresh } = useBatchDetail(batchId);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const batch = data?.batch ?? null;
 
@@ -104,6 +106,23 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     }
   };
 
+  const handleExportCsv = async () => {
+    if (!batch) {
+      return;
+    }
+    setExporting(true);
+    try {
+      await downloadBatchIssuesCsv(batch.id);
+      message.success("Issue CSV download started.");
+    } catch (err) {
+      message.error(
+        err instanceof Error ? err.message : "Unable to download CSV. Try again."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (status === "loading" || status === "idle") {
     return (
       <div style={{ minHeight: "50vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -160,7 +179,13 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
-      <Card>
+      <Card
+        extra={
+          <Button onClick={handleExportCsv} loading={exporting}>
+            Download issues CSV
+          </Button>
+        }
+      >
         <Typography.Title level={4} style={{ marginBottom: 0 }}>
           Batch overview
         </Typography.Title>

@@ -22,4 +22,13 @@ This document tracks the Supabase Edge Functions that backoffice services rely o
   - Updates `processing_jobs.status` to `completed`/`failed` and increments `batches.processed_files`, marking batches `completed` when all files are handled.
   - Returns a summary `{ processed, completed, failed }`.
 
+## `batch-issues-csv`
+- **Location**: `supabase/functions/batch-issues-csv/index.ts`
+- **Purpose**: Generates a CSV export of all issues associated with a batch so reviewers can download/share them.
+- **Inputs**: `GET` request with query parameter `batch_id` plus the caller’s Supabase session (Bearer token + publishable key). Requires the caller to belong to the same organisation as the batch.
+- **Side Effects**:
+  - Validates the authenticated user’s profile and organisation.
+  - Fetches `issues` joined with `employees` for the requested batch.
+  - Serialises the dataset via `buildBatchIssuesCsv` and responds with a `text/csv` attachment (`batch-{id}-issues.csv`).
+
  

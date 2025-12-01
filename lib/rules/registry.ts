@@ -25,6 +25,7 @@ const GROSS_CHANGE_THRESHOLD = 15; // %
 const TAX_SPIKE_THRESHOLD = 20; // %
 const USC_SPIKE_THRESHOLD = 20; // %
 const MAX_GROSS_DELTA_FOR_TAX_SPIKE = 5; // %
+const MAX_GROSS_DELTA_FOR_USC_SPIKE = 5; // %
 const PENSION_EMPLOYEE_THRESHOLD = 10; // %
 const PENSION_EMPLOYER_THRESHOLD = 12; // %
 
@@ -141,7 +142,7 @@ const baseRuleDefinitions: RuleDefinition[] = [
       if (!hasPreviousData(entry) || entry.percentChange === null) return null;
       if (Math.abs(entry.percentChange) < USC_SPIKE_THRESHOLD) return null;
       const grossPercent = diff.gross_pay.percentChange;
-      if (grossPercent !== null && Math.abs(grossPercent) > MAX_GROSS_DELTA_FOR_TAX_SPIKE) {
+      if (grossPercent !== null && Math.abs(grossPercent) > MAX_GROSS_DELTA_FOR_USC_SPIKE) {
         return null;
       }
       return applyIssue(
@@ -235,20 +236,22 @@ const baseRuleDefinitions: RuleDefinition[] = [
 
 let activeDefinitions = [...baseRuleDefinitions];
 
-export const getActiveRules = (country?: CountryCode, taxYear?: number): RuleDefinition[] =>
+export const getActiveRules = (
+  country?: CountryCode,
+  taxYear?: number | null
+): RuleDefinition[] =>
   activeDefinitions.filter((definition) => {
     const countries = definition.appliesTo?.countries;
-    if (countries && countries.length > 0 && country && !countries.includes(country)) {
-      return false;
+    if (countries && countries.length > 0) {
+      if (!country || !countries.includes(country)) {
+        return false;
+      }
     }
     const taxYears = definition.appliesTo?.taxYears;
-    if (
-      taxYears &&
-      taxYears.length > 0 &&
-      typeof taxYear === "number" &&
-      !taxYears.includes(taxYear)
-    ) {
-      return false;
+    if (taxYears && taxYears.length > 0) {
+      if (typeof taxYear !== "number" || !taxYears.includes(taxYear)) {
+        return false;
+      }
     }
     return true;
   });

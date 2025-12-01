@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { buildIssuesForPayslip } from "@/supabase/functions/process_batch/rules";
+import {
+  __dangerousSetRuleDefinitionsForTesting,
+  type RuleDefinition,
+} from "@/lib/rules/registry";
 
 const basePayslip = {
   id: "current",
@@ -25,6 +29,10 @@ const capture = (overrides: Partial<typeof basePayslip>, prevOverrides?: Partial
   const current = { ...basePayslip, ...overrides };
   return buildIssuesForPayslip(current, previous);
 };
+
+afterEach(() => {
+  __dangerousSetRuleDefinitionsForTesting();
+});
 
 describe("buildIssuesForPayslip", () => {
   it("generates issue rows for large net change", () => {
@@ -69,6 +77,40 @@ describe("buildIssuesForPayslip", () => {
   it("returns empty array when no rules triggered", () => {
     const issues = buildIssuesForPayslip(basePayslip, { ...basePayslip, id: "prev" });
     expect(issues).toHaveLength(0);
+  });
+
+  it("selects rule packs by country", () => {
+    const definitions: RuleDefinition[] = [
+      {
+        code: "NET_CHANGE_LARGE",
+        descriptionTemplate: "IE rule",
+        severity: "warning",
+        categories: [],
+        appliesTo: { countries: ["IE"] },
+        evaluate: () => ({ description: "IE triggered" }),
+      },
+      {
+        code: "GROSS_CHANGE_LARGE",
+        descriptionTemplate: "UK rule",
+        severity: "warning",
+        categories: [],
+        appliesTo: { countries: ["UK"] },
+        evaluate: () => ({ description: "UK triggered" }),
+      },
+    ];
+    __dangerousSetRuleDefinitionsForTesting(definitions);
+
+    const ieIssues = buildIssuesForPayslip(
+      { ...basePayslip, clients: { country: "IE" } },
+      null
+    );
+    expect(ieIssues.map((issue) => issue.rule_code)).toEqual(["NET_CHANGE_LARGE"]);
+
+    const ukIssues = buildIssuesForPayslip(
+      { ...basePayslip, clients: { country: "UK" } },
+      null
+    );
+    expect(ukIssues.map((issue) => issue.rule_code)).toEqual(["GROSS_CHANGE_LARGE"]);
   });
 });
 

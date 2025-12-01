@@ -25,6 +25,8 @@ export type RuleEvaluationContext = {
   current: PayslipLike;
   previous: PayslipLike | null;
   diff: PayslipDiff;
+  country: CountryCode;
+  taxYear: number | null;
 };
 
 export type RuleEvaluationOutcome = {

@@ -29,7 +29,11 @@ export const runRules = (
   options: RuleRuntimeOptions = {}
 ): IssueCandidate[] => {
   const issues: IssueCandidate[] = [];
-  const activeRules = getActiveRules(options.country, options.taxYear);
+  const derivedCountry = options.country ?? ("IE" as CountryCode);
+  const derivedTaxYear =
+    typeof options.taxYear === "number" ? options.taxYear : null;
+
+  const activeRules = getActiveRules(derivedCountry, derivedTaxYear);
 
   activeRules.forEach((rule) => {
     const results = normalizeResult(
@@ -37,6 +41,8 @@ export const runRules = (
         current,
         previous,
         diff,
+        country: derivedCountry,
+        taxYear: derivedTaxYear,
       })
     );
 

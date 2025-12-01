@@ -41,5 +41,20 @@ describe("rule registry", () => {
     const none = getActiveRules("IE", 2023);
     expect(none).toHaveLength(0);
   });
+
+  it("excludes rules when country missing but definition requires it", () => {
+    const definitions: RuleDefinition[] = [
+      {
+        code: "NET_CHANGE_LARGE",
+        descriptionTemplate: "Rule A",
+        severity: "warning",
+        categories: ["net"],
+        appliesTo: { countries: ["IE"] },
+        evaluate: () => null,
+      },
+    ];
+    __dangerousSetRuleDefinitionsForTesting(definitions);
+    expect(getActiveRules(undefined, 2025)).toHaveLength(0);
+  });
 });
 

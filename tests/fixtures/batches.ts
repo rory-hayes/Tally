@@ -9,6 +9,7 @@ export const batchFixture: BatchRow = {
   total_files: 0,
   processed_files: 0,
   notes: null,
+  employees_processed: 0,
 };
 
 

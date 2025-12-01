@@ -8,6 +8,7 @@ export type ClientRow = {
   name: string;
   country: string | null;
   payroll_system: string | null;
+  employees_processed?: number;
 };
 
 export type ClientCreateInput = {
@@ -24,6 +25,30 @@ function sanitizePayload<T extends Record<string, unknown>>(payload: T) {
   ) as T;
 }
 
+export type ClientEmployeeRow = {
+  client_id: string | null;
+  employee_id: string | null;
+};
+
+export const calculateClientEmployeeCounts = (
+  rows: ClientEmployeeRow[] | null | undefined
+) => {
+  const counts = new Map<string, number>();
+  const seen = new Set<string>();
+  (rows ?? []).forEach((row) => {
+    if (!row.client_id || !row.employee_id) {
+      return;
+    }
+    const occurrenceKey = `${row.client_id}:${row.employee_id}`;
+    if (seen.has(occurrenceKey)) {
+      return;
+    }
+    seen.add(occurrenceKey);
+    counts.set(row.client_id, (counts.get(row.client_id) ?? 0) + 1);
+  });
+  return counts;
+};
+
 export async function getClientsForOrg(
   organisationId: string
 ): Promise<ClientRow[]> {
@@ -38,7 +63,26 @@ export async function getClientsForOrg(
     throw new Error(`Failed to load clients: ${error.message}`);
   }
 
-  return (data ?? []) as unknown as ClientRow[];
+  const { data: payslipRows, error: payslipError } = await supabase
+    .from("payslips")
+    .select("client_id, employee_id")
+    .eq("organisation_id", organisationId);
+
+  if (payslipError) {
+    throw new Error(
+      `Failed to load client employee counts: ${payslipError.message}`
+    );
+  }
+
+  const counts = calculateClientEmployeeCounts(
+    payslipRows as ClientEmployeeRow[] | null
+  );
+
+  const clientRows = (data ?? []) as unknown as ClientRow[];
+  return clientRows.map((client) => ({
+    ...client,
+    employees_processed: counts.get(client.id) ?? 0,
+  }));
 }
 
 export const getClientsForOrganisation = getClientsForOrg;

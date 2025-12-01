@@ -57,7 +57,10 @@ function useBatchColumns(
       {
         title: "Employees",
         key: "employees",
-        render: () => "—",
+        render: (_value, record) =>
+          typeof record.employees_processed === "number"
+            ? record.employees_processed
+            : 0,
       },
       {
         title: "Actions",

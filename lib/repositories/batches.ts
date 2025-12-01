@@ -9,6 +9,7 @@ export type BatchRow = {
   total_files: number;
   processed_files: number;
   notes: string | null;
+  employees_processed?: number;
 };
 
 export type CreateBatchInput = {
@@ -22,6 +23,30 @@ export type CreateBatchInput = {
 
 const BATCH_COLUMNS =
   "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes";
+
+type BatchEmployeeRow = {
+  batch_id: string | null;
+  employee_id: string | null;
+};
+
+export const calculateBatchEmployeeCounts = (
+  rows: BatchEmployeeRow[] | null | undefined
+) => {
+  const counts = new Map<string, number>();
+  const seen = new Set<string>();
+  (rows ?? []).forEach((row) => {
+    if (!row.batch_id || !row.employee_id) {
+      return;
+    }
+    const key = `${row.batch_id}:${row.employee_id}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    counts.set(row.batch_id, (counts.get(row.batch_id) ?? 0) + 1);
+  });
+  return counts;
+};
 
 export async function createBatchForClient(
   organisationId: string,
@@ -67,7 +92,25 @@ export async function getBatchesForClient(
     throw new Error(error.message);
   }
 
-  return (data ?? []) as unknown as BatchRow[];
+  const { data: payslipRows, error: payslipError } = await supabase
+    .from("payslips")
+    .select("batch_id, employee_id")
+    .eq("organisation_id", organisationId)
+    .eq("client_id", clientId);
+
+  if (payslipError) {
+    throw new Error(`Failed to load batch employee counts: ${payslipError.message}`);
+  }
+
+  const counts = calculateBatchEmployeeCounts(
+    payslipRows as BatchEmployeeRow[] | null
+  );
+
+  const batchRows = (data ?? []) as unknown as BatchRow[];
+  return batchRows.map((batch) => ({
+    ...batch,
+    employees_processed: counts.get(batch.id) ?? 0,
+  }));
 }
 
 export async function getBatchById(

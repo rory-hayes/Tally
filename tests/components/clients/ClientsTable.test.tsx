@@ -4,8 +4,20 @@ import { ClientsTable } from "@/components/clients/ClientsTable";
 import type { ClientRow } from "@/lib/repositories/clients";
 
 const clients: ClientRow[] = [
-  { id: "1", name: "Acme", country: "IE", payroll_system: "Sage" },
-  { id: "2", name: "Beta", country: "UK", payroll_system: "BrightPay" },
+  {
+    id: "1",
+    name: "Acme",
+    country: "IE",
+    payroll_system: "Sage",
+    employees_processed: 5,
+  },
+  {
+    id: "2",
+    name: "Beta",
+    country: "UK",
+    payroll_system: "BrightPay",
+    employees_processed: 2,
+  },
 ];
 
 describe("ClientsTable", () => {

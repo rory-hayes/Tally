@@ -5,6 +5,7 @@ export const clientFixture: ClientRow = {
   name: "Acme Corp",
   country: "IE",
   payroll_system: "Sage",
+  employees_processed: 0,
 };
 
 

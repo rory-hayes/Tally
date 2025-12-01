@@ -6,6 +6,7 @@ vi.mock("@/lib/supabaseClient", () => ({
 
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import {
+  calculateBatchEmployeeCounts,
   createBatchForClient,
   getBatchesForClient,
   updateBatchStatus,
@@ -59,13 +60,20 @@ describe("batches repository", () => {
     eq.mockReturnValueOnce({ order });
     const select = vi.fn().mockReturnValue({ eq });
 
+    const payEqClient = vi.fn().mockResolvedValue({ data: [], error: null });
+    const payEqOrg = vi.fn().mockReturnValue({ eq: payEqClient });
+    const paySelect = vi.fn().mockReturnValue({ eq: payEqOrg });
+
     from.mockReturnValueOnce({ select });
+    from.mockReturnValueOnce({ select: paySelect });
 
     await getBatchesForClient("org-1", "client-9");
 
     expect(eq).toHaveBeenNthCalledWith(1, "organisation_id", "org-1");
     expect(eq).toHaveBeenNthCalledWith(2, "client_id", "client-9");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
+    expect(payEqOrg).toHaveBeenCalledWith("organisation_id", "org-1");
+    expect(payEqClient).toHaveBeenCalledWith("client_id", "client-9");
   });
 
   it("updates batch status within organisation", async () => {
@@ -94,6 +102,21 @@ describe("batches repository", () => {
     await expect(
       updateBatchStatus("org", "batch", {})
     ).rejects.toThrow(/No batch updates/);
+  });
+});
+
+describe("calculateBatchEmployeeCounts", () => {
+  it("returns unique employee counts per batch", () => {
+    const counts = calculateBatchEmployeeCounts([
+      { batch_id: "batch-1", employee_id: "A" },
+      { batch_id: "batch-1", employee_id: "A" },
+      { batch_id: "batch-1", employee_id: "B" },
+      { batch_id: "batch-2", employee_id: "C" },
+      { batch_id: null, employee_id: "Z" },
+    ]);
+
+    expect(counts.get("batch-1")).toBe(2);
+    expect(counts.get("batch-2")).toBe(1);
   });
 });
 

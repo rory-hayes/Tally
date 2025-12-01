@@ -6,6 +6,7 @@ vi.mock("@/lib/supabaseClient", () => ({
 
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import {
+  calculateClientEmployeeCounts,
   createClient,
   deleteClient,
   getClientsForOrg,
@@ -23,17 +24,22 @@ describe("clients repository", () => {
 
   it("queries clients scoped to an organisation", async () => {
     const order = vi.fn().mockResolvedValue({ data: [], error: null });
-    const eq = vi.fn().mockReturnValue({ order });
-    const select = vi.fn().mockReturnValue({ eq });
+    const eqClients = vi.fn().mockReturnValue({ order });
+    const selectClients = vi.fn().mockReturnValue({ eq: eqClients });
+    const payEq = vi.fn().mockResolvedValue({ data: [], error: null });
+    const selectPayslips = vi.fn().mockReturnValue({ eq: payEq });
 
-    from.mockReturnValueOnce({ select });
+    from.mockReturnValueOnce({ select: selectClients });
+    from.mockReturnValueOnce({ select: selectPayslips });
 
     await getClientsForOrg("org-123");
 
-    expect(from).toHaveBeenCalledWith("clients");
-    expect(select).toHaveBeenCalledWith("id, name, country, payroll_system");
-    expect(eq).toHaveBeenCalledWith("organisation_id", "org-123");
+    expect(from).toHaveBeenNthCalledWith(1, "clients");
+    expect(from).toHaveBeenNthCalledWith(2, "payslips");
+    expect(selectClients).toHaveBeenCalledWith("id, name, country, payroll_system");
+    expect(eqClients).toHaveBeenCalledWith("organisation_id", "org-123");
     expect(order).toHaveBeenCalledWith("name", { ascending: true });
+    expect(payEq).toHaveBeenCalledWith("organisation_id", "org-123");
   });
 
   it("returns client rows from Supabase response", async () => {
@@ -41,13 +47,18 @@ describe("clients repository", () => {
       { id: "1", name: "Alpha", country: "IE", payroll_system: "Sage" },
     ];
     const order = vi.fn().mockResolvedValue({ data: records, error: null });
-    const eq = vi.fn().mockReturnValue({ order });
-    const select = vi.fn().mockReturnValue({ eq });
+    const eqClients = vi.fn().mockReturnValue({ order });
+    const selectClients = vi.fn().mockReturnValue({ eq: eqClients });
+    const payEq = vi.fn().mockResolvedValue({ data: [], error: null });
+    const selectPayslips = vi.fn().mockReturnValue({ eq: payEq });
 
-    from.mockReturnValueOnce({ select });
+    from.mockReturnValueOnce({ select: selectClients });
+    from.mockReturnValueOnce({ select: selectPayslips });
 
     const result = await getClientsForOrg("org-123");
-    expect(result).toEqual(records);
+    expect(result).toEqual(
+      records.map((record) => ({ ...record, employees_processed: 0 }))
+    );
   });
 
   it("throws when client list query fails", async () => {
@@ -61,6 +72,35 @@ describe("clients repository", () => {
     from.mockReturnValueOnce({ select });
 
     await expect(getClientsForOrg("org-123")).rejects.toThrow(/boom/);
+  });
+
+  it("attaches unique employee counts per client", async () => {
+    const records = [
+      { id: "1", name: "Alpha", country: "IE", payroll_system: "Sage" },
+      { id: "2", name: "Beta", country: "UK", payroll_system: "Bright" },
+    ];
+    const order = vi.fn().mockResolvedValue({ data: records, error: null });
+    const eqClients = vi.fn().mockReturnValue({ order });
+    const selectClients = vi.fn().mockReturnValue({ eq: eqClients });
+
+    const payRows = [
+      { client_id: "1", employee_id: "emp-1" },
+      { client_id: "1", employee_id: "emp-1" }, // duplicate should be ignored
+      { client_id: "1", employee_id: "emp-2" },
+      { client_id: "2", employee_id: "emp-9" },
+      { client_id: null, employee_id: "emp-0" },
+    ];
+    const payEq = vi.fn().mockResolvedValue({ data: payRows, error: null });
+    const selectPayslips = vi.fn().mockReturnValue({ eq: payEq });
+
+    from.mockReturnValueOnce({ select: selectClients });
+    from.mockReturnValueOnce({ select: selectPayslips });
+
+    const result = await getClientsForOrg("org-123");
+    expect(result).toEqual([
+      { ...records[0], employees_processed: 2 },
+      { ...records[1], employees_processed: 1 },
+    ]);
   });
 
   it("creates a client tied to the organisation", async () => {
@@ -154,6 +194,22 @@ describe("clients repository", () => {
     await expect(deleteClient("org-1", "client-1")).rejects.toThrow(
       /cannot delete/
     );
+  });
+});
+
+describe("calculateClientEmployeeCounts", () => {
+  it("counts unique employees per client", () => {
+    const counts = calculateClientEmployeeCounts([
+      { client_id: "1", employee_id: "A" },
+      { client_id: "1", employee_id: "A" },
+      { client_id: "1", employee_id: "B" },
+      { client_id: "2", employee_id: "C" },
+      { client_id: "2", employee_id: null },
+      { client_id: null, employee_id: "X" },
+    ]);
+
+    expect(counts.get("1")).toBe(2);
+    expect(counts.get("2")).toBe(1);
   });
 });
 

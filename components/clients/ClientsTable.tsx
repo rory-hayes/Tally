@@ -37,6 +37,12 @@ const columns = (
     render: (value: string | null) => value ?? "—",
   },
   {
+    title: "Employees processed",
+    dataIndex: "employees_processed",
+    key: "employees_processed",
+    render: (value: number | undefined) => value ?? 0,
+  },
+  {
     title: "Actions",
     key: "actions",
     align: "right" as const,

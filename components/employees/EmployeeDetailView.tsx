@@ -22,7 +22,7 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEmployeeComparison } from "@/hooks/useEmployeeComparison";
-import type { IssueSeverity } from "@/lib/repositories/employeeDetails";
+import type { IssueSeverity, IssueRow } from "@/lib/repositories/employeeDetails";
 import { useOrganisation } from "@/context/OrganisationContext";
 
 const fieldLabels: Record<string, string> = {
@@ -85,12 +85,12 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
     }));
   }, [data]);
 
-  const buildResolvedTooltip = (issue: (typeof issueItems)[number]) => {
+const buildResolvedTooltip = (issue: IssueRow, profileId: string | null) => {
     if (!issue.resolved || !issue.resolved_at) {
       return null;
     }
     const resolverLabel =
-      issue.resolved_by && profileId && issue.resolved_by === profileId
+    issue.resolved_by && profileId && issue.resolved_by === profileId
         ? "you"
         : issue.resolved_by ?? "another user";
     const resolvedDate = new Date(issue.resolved_at).toLocaleString(undefined, {
@@ -238,59 +238,57 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
       </Card>
 
       <Card title="Issues">
-        {issueItems.length === 0 ? (
-          <Empty description="No issues for this employee." />
-        ) : (
-          <List
-            dataSource={issueItems}
-            renderItem={(issue) => (
-              <List.Item
-                actions={[
-                  <Button
-                    key="resolve"
-                    type="link"
-                    onClick={() => handleResolve(issue.id, issue.resolved)}
-                  >
-                    {issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
-                  </Button>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    (() => {
-                      const resolvedInfo = buildResolvedTooltip(issue);
-                      const descriptionNode = (
-                        <Typography.Text
-                          delete={issue.resolved}
-                          type={issue.resolved ? "secondary" : undefined}
-                          data-resolved-info={resolvedInfo ?? undefined}
-                        >
-                          {issue.description}
-                        </Typography.Text>
-                      );
-                      const content = (
-                        <Space>
-                          <Tag color={severityColor[issue.severity]}>{issue.severity}</Tag>
-                          {resolvedInfo ? (
-                            <Tooltip title={resolvedInfo}>{descriptionNode}</Tooltip>
-                          ) : (
-                            descriptionNode
-                          )}
-                        </Space>
-                      );
-                      return content;
-                    })()
-                  }
-                  description={
-                    issue.note ? (
-                      <Typography.Text type="secondary">Note: {issue.note}</Typography.Text>
-                    ) : null
-                  }
-                />
-              </List.Item>
-            )}
-          />
-        )}
+        <List
+          data-testid="employee-issues-list"
+          dataSource={issueItems}
+          locale={{ emptyText: "No issues for this employee." }}
+          renderItem={(issue) => (
+            <List.Item
+              actions={[
+                <Button
+                  key="resolve"
+                  type="link"
+                  onClick={() => handleResolve(issue.id, issue.resolved)}
+                >
+                  {issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={
+                  (() => {
+                    const resolvedInfo = buildResolvedTooltip(issue, profileId);
+                    const descriptionNode = (
+                      <Typography.Text
+                        delete={issue.resolved}
+                        type={issue.resolved ? "secondary" : undefined}
+                        data-resolved-info={resolvedInfo ?? undefined}
+                      >
+                        {issue.description}
+                      </Typography.Text>
+                    );
+                    const content = (
+                      <Space>
+                        <Tag color={severityColor[issue.severity]}>{issue.severity}</Tag>
+                        {resolvedInfo ? (
+                          <Tooltip title={resolvedInfo}>{descriptionNode}</Tooltip>
+                        ) : (
+                          descriptionNode
+                        )}
+                      </Space>
+                    );
+                    return content;
+                  })()
+                }
+                description={
+                  issue.note ? (
+                    <Typography.Text type="secondary">Note: {issue.note}</Typography.Text>
+                  ) : null
+                }
+              />
+            </List.Item>
+          )}
+        />
       </Card>
 
       <Modal

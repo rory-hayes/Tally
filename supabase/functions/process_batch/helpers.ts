@@ -204,6 +204,9 @@ const parseSlashDate = (token: string) => {
   return toIsoDate(new Date(Date.UTC(year, month, day)));
 };
 
+const PERIOD_LABEL_REGEX =
+  /(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[^\d]{0,10}(\d{4})/i;
+
 const findPayDate = (lines: string[]) => {
   for (const line of lines) {
     const isoMatch = line.match(/\b\d{4}-\d{2}-\d{2}\b/);
@@ -279,17 +282,15 @@ type PayslipJob = {
 export const derivePayDateFromBatch = (
   periodLabel?: string | null,
   createdAt?: string | null
-) => {
+): string | null => {
   if (periodLabel) {
-    const match = periodLabel.match(
-      /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+(\d{4})\b/i
-    );
+    const match = periodLabel.match(PERIOD_LABEL_REGEX);
     if (match) {
       const monthIndex = MONTH_MAP[match[1].toLowerCase()];
       const year = Number(match[2]);
       if (monthIndex !== undefined && !Number.isNaN(year)) {
         const date = new Date(Date.UTC(year, monthIndex, 1));
-        return toIsoDate(date)!;
+        return toIsoDate(date);
       }
     }
   }
@@ -298,7 +299,7 @@ export const derivePayDateFromBatch = (
     return createdAt.slice(0, 10);
   }
 
-  return toIsoDate(new Date())!;
+  return null;
 };
 
 export const buildPayslipInsert = (

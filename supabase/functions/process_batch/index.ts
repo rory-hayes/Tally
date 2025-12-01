@@ -163,8 +163,11 @@ async function handleJob(
 
     const employeeId = await resolveEmployee(supabase, job);
     const previousPayslip = await fetchPreviousPayslip(supabase, job, employeeId);
-    const payDate =
-      normalized.pay_date ?? derivePayDateFromBatch(batchMeta.period_label, batchMeta.created_at);
+    const derivedPayDate = derivePayDateFromBatch(batchMeta.period_label, batchMeta.created_at);
+    const payDate = normalized.pay_date ?? derivedPayDate;
+    if (!payDate) {
+      throw new Error("Unable to determine pay date for payslip");
+    }
     const currentPayslip = await insertPayslip(supabase, job, employeeId, normalized, payDate);
     await insertInfoIssue(supabase, job, employeeId, normalized);
     await insertRuleIssues(supabase, currentPayslip, previousPayslip);

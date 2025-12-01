@@ -105,6 +105,11 @@ describe("derivePayDateFromBatch", () => {
     expect(date).toBe("2025-01-01");
   });
 
+  it("parses month labels with surrounding text", () => {
+    const date = derivePayDateFromBatch("Payroll - March 2025 run", null);
+    expect(date).toBe("2025-03-01");
+  });
+
   it("falls back to created_at when label missing", () => {
     const date = derivePayDateFromBatch(null, "2025-02-15T10:00:00Z");
     expect(date).toBe("2025-02-15");

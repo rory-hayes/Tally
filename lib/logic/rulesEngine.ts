@@ -37,6 +37,7 @@ const GROSS_CHANGE_THRESHOLD = 15; // %
 const TAX_SPIKE_THRESHOLD = 20; // %
 const USC_SPIKE_THRESHOLD = 20; // %
 const MAX_GROSS_DELTA_FOR_TAX_SPIKE = 5; // %
+const MAX_GROSS_DELTA_FOR_USC_SPIKE = 5; // %
 const PENSION_EMPLOYEE_THRESHOLD = 10; // %
 const PENSION_EMPLOYER_THRESHOLD = 12; // %
 
@@ -83,14 +84,28 @@ const RULE_DEFINITIONS: Record<RuleCode, RuleDefinition> = {
   },
 };
 
+const currencyFormatter = new Intl.NumberFormat("en-IE", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+});
+
 const formatAmount = (value: number | null | undefined) =>
-  typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
+  typeof value === "number" ? currencyFormatter.format(value) : "n/a";
 
 const formatPercent = (value: number | null | undefined) =>
   typeof value === "number" ? `${value.toFixed(1)}%` : "n/a";
 
 const formatSignedPercent = (value: number | null) =>
   typeof value === "number" ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}%` : "n/a";
+
+const describeGrossDelta = (percent: number | null) => {
+  if (percent === null || Math.abs(percent) < 0.01) {
+    return "stayed flat";
+  }
+  const direction = percent > 0 ? "increased" : "decreased";
+  return `${direction} by ${formatSignedPercent(percent)}`;
+};
 
 const pushIssue = (
   issues: IssueCandidate[],
@@ -113,15 +128,12 @@ const pensionPercent = (amount: number | null, gross: number | null) =>
   amount !== null && gross && gross !== 0 ? (amount / gross) * 100 : null;
 
 const describeUscSpike = (
-  uscPercent: number | null,
+  uscPercent: number,
   uscPrevious: number | null,
   uscCurrent: number | null,
   grossPercent: number | null
 ) => {
-  const grossDescriptor =
-    grossPercent === null
-      ? "stayed flat"
-      : `changed by ${formatSignedPercent(grossPercent)}`;
+  const grossDescriptor = describeGrossDelta(grossPercent);
   return `USC/NI increased by ${formatSignedPercent(uscPercent)} (${formatAmount(uscPrevious)} → ${formatAmount(
     uscCurrent
   )}) while gross pay ${grossDescriptor}`;
@@ -133,7 +145,7 @@ const describePensionPercent = (
   contribution: number | null | undefined,
   gross: number | null | undefined
 ) =>
-  `${label} is ${percent.toFixed(1)}% of gross pay (${formatAmount(contribution)} / ${formatAmount(gross)})`;
+  `${label} is ${percent.toFixed(1)}% of gross pay (${formatAmount(contribution)}/${formatAmount(gross)})`;
 
 export const runRules = (
   current: PayslipLike,
@@ -191,7 +203,7 @@ export const runRules = (
   ) {
     const grossPercent = diff.gross_pay.percentChange;
     const withinTolerance =
-      grossPercent === null || Math.abs(grossPercent) <= MAX_GROSS_DELTA_FOR_TAX_SPIKE;
+      grossPercent === null || Math.abs(grossPercent) <= MAX_GROSS_DELTA_FOR_USC_SPIKE;
     if (withinTolerance) {
       pushIssue(issues, "USC_SPIKE_WITHOUT_GROSS", {
         detail: describeUscSpike(

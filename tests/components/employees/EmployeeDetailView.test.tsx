@@ -9,7 +9,7 @@ vi.mock("@/hooks/useEmployeeComparison", () => ({
 }));
 
 vi.mock("@/context/OrganisationContext", () => ({
-  useOrganisation: () => ({ organisationId: "org-123", role: "admin" }),
+  useOrganisation: () => ({ organisationId: "org-123", role: "admin", profileId: "profile-current" }),
 }));
 
 const sampleComparison = {
@@ -40,6 +40,8 @@ const sampleComparison = {
       description: "Net pay increased significantly",
       resolved: false,
       note: null,
+      resolved_at: null,
+      resolved_by: null,
     },
     {
       id: "issue-2",
@@ -48,6 +50,8 @@ const sampleComparison = {
       description: "USC spiked",
       resolved: true,
       note: null,
+      resolved_at: "2025-03-01T10:00:00.000Z",
+      resolved_by: "profile-current",
     },
   ],
 };
@@ -94,10 +98,11 @@ describe("EmployeeDetailView", () => {
     );
   });
 
-  it("renders resolved issues with secondary styling", () => {
+  it("renders resolved issues with secondary styling and tooltip metadata", () => {
     render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
     const resolved = screen.getByText(/usc spiked/i).closest("span");
     expect(resolved).toHaveClass("ant-typography-secondary");
+    expect(resolved?.getAttribute("data-resolved-info")).toMatch(/Resolved by you on/);
   });
 });
 

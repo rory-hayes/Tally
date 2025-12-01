@@ -11,6 +11,8 @@ export type IssueRow = {
   description: string;
   resolved: boolean;
   note: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
 };
 
 export type EmployeeComparison = {
@@ -86,7 +88,9 @@ export async function fetchEmployeeComparison(args: {
           severity,
           description,
           resolved,
-          note
+          note,
+          resolved_at,
+          resolved_by
         )
       `
     )
@@ -146,13 +150,17 @@ export async function updateIssueResolution(args: {
 }) {
   const supabase = getSupabaseBrowserClient();
   const { issueId, resolved, note, audit } = args;
+  const resolvedAt = resolved ? new Date().toISOString() : null;
+  const resolvedBy = resolved ? audit?.actorId ?? null : null;
+  const updatePayload = {
+    resolved,
+    note: note ?? null,
+    resolved_at: resolvedAt,
+    resolved_by: resolvedBy,
+  };
   const { error } = await supabase
     .from("issues")
-    .update({
-      resolved,
-      note: note ?? null,
-      resolved_at: resolved ? new Date().toISOString() : null,
-    })
+    .update(updatePayload)
     .eq("id", issueId);
 
   if (error) {

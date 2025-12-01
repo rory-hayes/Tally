@@ -41,6 +41,12 @@ describe("updateIssueResolution", () => {
       },
     });
 
+    expect(updateMock).toHaveBeenCalledWith({
+      resolved: true,
+      note: "done",
+      resolved_at: expect.any(String),
+      resolved_by: "user-1",
+    });
     expect(auditLogMock).toHaveBeenCalledWith({
       organisationId: "org-1",
       actorId: "user-1",
@@ -58,6 +64,12 @@ describe("updateIssueResolution", () => {
     await updateIssueResolution({
       issueId: "issue-1",
       resolved: false,
+    });
+    expect(updateMock).toHaveBeenCalledWith({
+      resolved: false,
+      note: null,
+      resolved_at: null,
+      resolved_by: null,
     });
     expect(auditLogMock).not.toHaveBeenCalled();
   });

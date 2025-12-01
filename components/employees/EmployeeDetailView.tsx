@@ -18,10 +18,12 @@ import {
   Table,
   Tag,
   Typography,
+  Tooltip,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEmployeeComparison } from "@/hooks/useEmployeeComparison";
 import type { IssueSeverity } from "@/lib/repositories/employeeDetails";
+import { useOrganisation } from "@/context/OrganisationContext";
 
 const fieldLabels: Record<string, string> = {
   gross_pay: "Gross pay",
@@ -44,6 +46,7 @@ type EmployeeDetailViewProps = {
 };
 
 export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewProps) {
+  const { profileId } = useOrganisation();
   const { status, data, error, toggleIssue } = useEmployeeComparison(employeeId, batchId);
   const [noteModal, setNoteModal] = useState<{ open: boolean; issueId: string | null; note: string }>({
     open: false,
@@ -64,6 +67,21 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
   }, [data]);
 
   const issueItems = data?.issues ?? [];
+
+  const buildResolvedTooltip = (issue: (typeof issueItems)[number]) => {
+    if (!issue.resolved || !issue.resolved_at) {
+      return null;
+    }
+    const resolverLabel =
+      issue.resolved_by && profileId && issue.resolved_by === profileId
+        ? "you"
+        : issue.resolved_by ?? "another user";
+    const resolvedDate = new Date(issue.resolved_at).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    return `Resolved by ${resolverLabel} on ${resolvedDate}`;
+  };
 
   const columns: ColumnsType<(typeof diffRows)[number]> = [
     { title: "Field", dataIndex: "label", key: "label" },
@@ -217,15 +235,29 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
               >
                 <List.Item.Meta
                   title={
-                    <Space>
-                      <Tag color={severityColor[issue.severity]}>{issue.severity}</Tag>
-                      <Typography.Text
-                        delete={issue.resolved}
-                        type={issue.resolved ? "secondary" : undefined}
-                      >
-                        {issue.description}
-                      </Typography.Text>
-                    </Space>
+                    (() => {
+                      const resolvedInfo = buildResolvedTooltip(issue);
+                      const descriptionNode = (
+                        <Typography.Text
+                          delete={issue.resolved}
+                          type={issue.resolved ? "secondary" : undefined}
+                          data-resolved-info={resolvedInfo ?? undefined}
+                        >
+                          {issue.description}
+                        </Typography.Text>
+                      );
+                      const content = (
+                        <Space>
+                          <Tag color={severityColor[issue.severity]}>{issue.severity}</Tag>
+                          {resolvedInfo ? (
+                            <Tooltip title={resolvedInfo}>{descriptionNode}</Tooltip>
+                          ) : (
+                            descriptionNode
+                          )}
+                        </Space>
+                      );
+                      return content;
+                    })()
                   }
                   description={
                     issue.note ? (

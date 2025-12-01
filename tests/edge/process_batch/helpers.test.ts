@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildPayslipInsert,
+  derivePayDateFromBatch,
   ensureNormalizedHasContent,
   listMissingFields,
   normalizeTextractResponse,
@@ -10,6 +11,7 @@ const sampleResponse = {
   Blocks: [
     { BlockType: "LINE", Text: "Payslip" },
     { BlockType: "LINE", Text: "PRSI Class A1" },
+    { BlockType: "LINE", Text: "Pay Date: 31 Jan 2025" },
     { BlockType: "LINE", Text: "Gross Pay: 3,000.00" },
     { BlockType: "LINE", Text: "PAYE: 600.00" },
     { BlockType: "LINE", Text: "USC/NI: 135.50" },
@@ -33,6 +35,7 @@ describe("normalizeTextractResponse", () => {
     expect(normalized.pension_ee).toBe(150);
     expect(normalized.pension_er).toBe(180);
     expect(normalized.prsi_category).toBe("A1");
+    expect(normalized.pay_date).toBe("2025-01-31");
     expect(normalized.raw_text).toContain("Gross Pay");
   });
 
@@ -59,13 +62,14 @@ describe("buildPayslipInsert", () => {
       storage_path: "batches/batch-1/file.pdf",
     };
 
-    const payload = buildPayslipInsert(job, "employee-1", normalized);
+    const payload = buildPayslipInsert(job, "employee-1", normalized, "2025-01-31");
 
     expect(payload).toMatchObject({
       organisation_id: job.organisation_id,
       client_id: job.client_id,
       batch_id: job.batch_id,
       employee_id: "employee-1",
+      pay_date: "2025-01-31",
       gross_pay: 3000,
       net_pay: 2115,
       paye: 600,
@@ -76,6 +80,18 @@ describe("buildPayslipInsert", () => {
       prsi_or_ni_category: "A1",
     });
     expect(payload.raw_ocr_json.raw_text).toContain("Payslip");
+  });
+});
+
+describe("derivePayDateFromBatch", () => {
+  it("parses month labels", () => {
+    const date = derivePayDateFromBatch("Jan 2025", null);
+    expect(date).toBe("2025-01-01");
+  });
+
+  it("falls back to created_at when label missing", () => {
+    const date = derivePayDateFromBatch(null, "2025-02-15T10:00:00Z");
+    expect(date).toBe("2025-02-15");
   });
 });
 

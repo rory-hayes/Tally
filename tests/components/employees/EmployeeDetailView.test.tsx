@@ -18,8 +18,8 @@ const sampleComparison = {
   employeeRef: "EMP001",
   batchId: "batch-1",
   clientId: "client-1",
-  currentPayslip: { id: "cur", net_pay: 2100, gross_pay: 3200 },
-  previousPayslip: { id: "prev", net_pay: 2000, gross_pay: 3000 },
+  currentPayslip: { id: "cur", net_pay: 2100, gross_pay: 3200, pay_date: "2025-02-28" },
+  previousPayslip: { id: "prev", net_pay: 2000, gross_pay: 3000, pay_date: "2025-01-31" },
   diff: {
     gross_pay: { previous: 3000, current: 3200, delta: 200, percentChange: 6.7 },
     net_pay: { previous: 2000, current: 2100, delta: 100, percentChange: 5 },
@@ -59,6 +59,8 @@ describe("EmployeeDetailView", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getAllByText("Gross pay").length).toBeGreaterThan(0);
     expect(screen.getByText("Issues")).toBeInTheDocument();
+    expect(screen.getByText("2025-02-28")).toBeInTheDocument();
+    expect(screen.getByText("2025-01-31")).toBeInTheDocument();
   });
 
   it("opens resolve modal and calls toggleIssue", async () => {

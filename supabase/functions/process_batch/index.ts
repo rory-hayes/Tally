@@ -8,6 +8,7 @@ import {
   buildBatchUpdatePayload,
   buildPayslipInsert,
   deriveIdentifierFromPath,
+  derivePayDateFromBatch,
   ensureNormalizedHasContent,
   listMissingFields,
   normalizeTextractResponse,
@@ -141,6 +142,7 @@ async function handleJob(
   job: JobRow
 ) {
   try {
+    const batchMeta = await fetchBatchMeta(supabase, job.batch_id, job.organisation_id);
     const bytes = await loadFileFromStorage(supabase, job.storage_path);
     console.log(`[process_batch] Downloaded ${job.storage_path}`);
 
@@ -161,7 +163,9 @@ async function handleJob(
 
     const employeeId = await resolveEmployee(supabase, job);
     const previousPayslip = await fetchPreviousPayslip(supabase, job, employeeId);
-    const currentPayslip = await insertPayslip(supabase, job, employeeId, normalized);
+    const payDate =
+      normalized.pay_date ?? derivePayDateFromBatch(batchMeta.period_label, batchMeta.created_at);
+    const currentPayslip = await insertPayslip(supabase, job, employeeId, normalized, payDate);
     await insertInfoIssue(supabase, job, employeeId, normalized);
     await insertRuleIssues(supabase, currentPayslip, previousPayslip);
     await markJobStatus(supabase, job.id, true);
@@ -240,9 +244,10 @@ async function insertPayslip(
   supabase: ReturnType<typeof createClient>,
   job: JobRow,
   employeeId: string,
-  normalized: NormalizedTextractResult
+  normalized: NormalizedTextractResult,
+  payDate: string
 ) {
-  const payload = buildPayslipInsert(job, employeeId, normalized);
+  const payload = buildPayslipInsert(job, employeeId, normalized, payDate);
   const { data, error } = await supabase
     .from("payslips")
     .insert(payload)
@@ -346,5 +351,35 @@ async function updateBatchProgress(
   );
 
   await supabase.from("batches").update(updates).eq("id", batchId);
+}
+
+type BatchMeta = {
+  period_label: string | null;
+  created_at: string | null;
+};
+
+async function fetchBatchMeta(
+  supabase: ReturnType<typeof createClient>,
+  batchId: string,
+  organisationId: string
+): Promise<BatchMeta> {
+  const { data, error } = await supabase
+    .from("batches")
+    .select("period_label, created_at, organisation_id")
+    .eq("id", batchId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Batch not found");
+  }
+
+  if (data.organisation_id !== organisationId) {
+    throw new Error("Batch does not belong to organisation");
+  }
+
+  return {
+    period_label: data.period_label ?? null,
+    created_at: data.created_at ?? null,
+  };
 }
 

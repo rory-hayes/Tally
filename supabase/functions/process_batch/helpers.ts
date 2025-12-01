@@ -16,6 +16,7 @@ export type NormalizedTextractResult = {
   pension_ee: number | null;
   pension_er: number | null;
   prsi_category: string | null;
+  pay_date: string | null;
 };
 
 const NUMERIC_FIELDS = [
@@ -96,10 +97,12 @@ export const normalizeTextractResponse = (
   );
 
   const prsiCategory = findPrsiCategory(lines);
+  const payDate = findPayDate(lines);
 
   return {
     raw_text: lines.join("\n"),
     prsi_category: prsiCategory,
+    pay_date: payDate,
     ...parsedValues,
   };
 };
@@ -110,6 +113,91 @@ const findPrsiCategory = (lines: string[]) => {
     const match = line.match(pattern);
     if (match?.[2]) {
       return match[2].toUpperCase();
+    }
+  }
+  return null;
+};
+
+const MONTH_MAP: Record<string, number> = {
+  january: 0,
+  jan: 0,
+  february: 1,
+  feb: 1,
+  march: 2,
+  mar: 2,
+  april: 3,
+  apr: 3,
+  may: 4,
+  june: 5,
+  jun: 5,
+  july: 6,
+  jul: 6,
+  august: 7,
+  aug: 7,
+  september: 8,
+  sep: 8,
+  sept: 8,
+  october: 9,
+  oct: 9,
+  november: 10,
+  nov: 10,
+  december: 11,
+  dec: 11,
+};
+
+const toIsoDate = (date: Date) => {
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
+const stripOrdinals = (value: string) => value.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+
+const parseDayMonthYear = (day: number, monthToken: string, year: number) => {
+  const monthIndex = MONTH_MAP[monthToken.toLowerCase()];
+  if (monthIndex === undefined) return null;
+  return toIsoDate(new Date(Date.UTC(year, monthIndex, day)));
+};
+
+const parseSlashDate = (token: string) => {
+  const parts = token.split(/[\/-]/).map((part) => part.trim());
+  if (parts.length !== 3) return null;
+  const [a, b, c] = parts;
+
+  if (a.length === 4) {
+    return toIsoDate(new Date(`${a}-${b}-${c}`));
+  }
+
+  const day = Number(a);
+  const month = Number(b) - 1;
+  const year = Number(c.length === 2 ? `20${c}` : c);
+  if (Number.isNaN(day) || Number.isNaN(month) || Number.isNaN(year)) {
+    return null;
+  }
+  return toIsoDate(new Date(Date.UTC(year, month, day)));
+};
+
+const findPayDate = (lines: string[]) => {
+  for (const line of lines) {
+    const isoMatch = line.match(/\b\d{4}-\d{2}-\d{2}\b/);
+    if (isoMatch?.[0]) {
+      const parsed = toIsoDate(new Date(isoMatch[0]));
+      if (parsed) return parsed;
+    }
+
+    const slashMatch = line.match(/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b/);
+    if (slashMatch?.[0]) {
+      const parsed = parseSlashDate(slashMatch[0]);
+      if (parsed) return parsed;
+    }
+
+    const textMatch = line.match(
+      /\b\d{1,2}(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+\d{4}\b/i
+    );
+    if (textMatch?.[0]) {
+      const cleaned = stripOrdinals(textMatch[0]);
+      const [dayToken, monthToken, yearToken] = cleaned.split(/\s+/);
+      const parsed = parseDayMonthYear(Number(dayToken), monthToken, Number(yearToken));
+      if (parsed) return parsed;
     }
   }
   return null;
@@ -160,16 +248,42 @@ type PayslipJob = {
   storage_path: string;
 };
 
+export const derivePayDateFromBatch = (
+  periodLabel?: string | null,
+  createdAt?: string | null
+) => {
+  if (periodLabel) {
+    const match = periodLabel.match(
+      /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+(\d{4})\b/i
+    );
+    if (match) {
+      const monthIndex = MONTH_MAP[match[1].toLowerCase()];
+      const year = Number(match[2]);
+      if (monthIndex !== undefined && !Number.isNaN(year)) {
+        const date = new Date(Date.UTC(year, monthIndex, 1));
+        return toIsoDate(date)!;
+      }
+    }
+  }
+
+  if (createdAt) {
+    return createdAt.slice(0, 10);
+  }
+
+  return toIsoDate(new Date())!;
+};
+
 export const buildPayslipInsert = (
   job: PayslipJob,
   employeeId: string,
-  normalized: NormalizedTextractResult
+  normalized: NormalizedTextractResult,
+  payDate: string
 ) => ({
   organisation_id: job.organisation_id,
   client_id: job.client_id,
   batch_id: job.batch_id,
   employee_id: employeeId,
-  pay_date: new Date().toISOString().slice(0, 10),
+  pay_date: payDate,
   gross_pay: normalized.gross_pay,
   net_pay: normalized.net_pay,
   paye: normalized.paye,

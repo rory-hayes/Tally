@@ -96,8 +96,10 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
 
   if (status === "loading" || status === "idle") {
     return (
-      <div style={{ minHeight: "50vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
-        <Spin />
+      <div
+        style={{ minHeight: "50vh", display: "flex", justifyContent: "center", alignItems: "center" }}
+      >
+        <Spin aria-label="Loading employee details" />
       </div>
     );
   }

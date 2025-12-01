@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Space, Typography, Button, message } from "antd";
+import { Card, Space, Typography, Button, message, Spin, Empty, Alert } from "antd";
 import AppLayout from "@/components/layout/AppLayout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useOrganisation } from "@/context/OrganisationContext";
@@ -29,18 +29,21 @@ export function ClientsManager() {
   const { organisationId } = useOrganisation();
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getClientsForOrg(organisationId);
       setClients(data);
     } catch (err) {
-      message.error(
-        err instanceof Error ? err.message : "Unable to load clients"
-      );
+      const messageText =
+        err instanceof Error ? err.message : "Unable to load clients";
+      setError(messageText);
+      message.error(messageText);
     } finally {
       setLoading(false);
     }
@@ -117,12 +120,38 @@ export function ClientsManager() {
       </Space>
 
       <Card>
-        <ClientsTable
-          loading={loading}
-          clients={clients}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
+        {error ? (
+          <div style={{ marginBottom: 16 }}>
+            <Alert
+              type="error"
+              message="Unable to load clients"
+              description={error}
+              showIcon
+            />
+          </div>
+        ) : null}
+
+        {loading && clients.length === 0 ? (
+          <div
+            style={{
+              minHeight: 160,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Spin aria-label="Loading clients" />
+          </div>
+        ) : clients.length === 0 ? (
+          <Empty description="No clients yet. Click “Add client” to create your first one." />
+        ) : (
+          <ClientsTable
+            loading={loading}
+            clients={clients}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        )}
       </Card>
 
       <ClientFormModal

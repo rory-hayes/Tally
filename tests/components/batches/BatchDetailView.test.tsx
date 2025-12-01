@@ -1,5 +1,4 @@
 import React from "react";
-import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, beforeEach } from "vitest";
 import { BatchDetailView } from "@/components/batches/BatchDetailView";
@@ -119,6 +118,34 @@ describe("BatchDetailView", () => {
     render(<BatchDetailView batchId="batch-1" />);
     fireEvent.click(screen.getByRole("button", { name: /view report/i }));
     expect(screen.getByTestId("batch-report-modal")).toBeInTheDocument();
+  });
+
+  it("shows spinner while loading", () => {
+    mockUseBatchDetail.mockReturnValue({
+      status: "loading",
+      data: null,
+      error: null,
+      refresh: vi.fn(),
+    });
+
+    render(<BatchDetailView batchId="batch-1" />);
+    expect(screen.getByLabelText(/loading batch/i)).toBeInTheDocument();
+  });
+
+  it("renders Empty state when no employees", () => {
+    mockUseBatchDetail.mockReturnValue({
+      status: "success",
+      data: {
+        ...sampleDetail,
+        employees: [],
+        totals: { employeesProcessed: 0, critical: 0, warning: 0, info: 0 },
+      },
+      error: null,
+      refresh: vi.fn(),
+    });
+
+    render(<BatchDetailView batchId="batch-1" />);
+    expect(screen.getByText(/No employees processed yet/i)).toBeInTheDocument();
   });
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Button, Modal, Space, Table, Typography } from "antd";
+import { Button, Empty, Modal, Space, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { BatchDetail, EmployeeIssueSummary } from "@/lib/repositories/batchDetails";
 
@@ -73,7 +73,7 @@ export function BatchReportModal({
         </Button>,
       ]}
     >
-      <Space direction="vertical" size="large" style={{ width: "100%" }}>
+      <Space orientation="vertical" size="large" style={{ width: "100%" }}>
         <div>
           <Typography.Title level={4} style={{ marginBottom: 4 }}>
             {batch.period_label}
@@ -92,7 +92,7 @@ export function BatchReportModal({
         </Space>
 
         {employees.length === 0 ? (
-          <Typography.Text type="secondary">No issues found for this batch.</Typography.Text>
+          <Empty description="No issues found for this batch." />
         ) : (
           <Table<EmployeeIssueSummary>
             dataSource={employees}

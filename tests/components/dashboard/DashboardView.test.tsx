@@ -70,6 +70,19 @@ describe("DashboardView", () => {
     expect(link).toHaveAttribute("href", "/clients/client-1");
   });
 
+  it("shows Empty state when there are no clients", () => {
+    mockUseDashboardSummary.mockReturnValue({
+      status: "success",
+      data: [],
+      error: null,
+    });
+
+    render(<DashboardView />);
+    expect(
+      screen.getByText(/No clients yet. Upload a batch to get started./i)
+    ).toBeInTheDocument();
+  });
+
   it("shows error message when loading fails", () => {
     mockUseDashboardSummary.mockReturnValue({
       status: "error",

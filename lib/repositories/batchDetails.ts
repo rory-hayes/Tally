@@ -202,8 +202,15 @@ export async function fetchBatchDetail(
     throw new Error(`Failed to load processing jobs: ${jobsError.message}`);
   }
 
+  const normalizedPayslips = payslips
+    ? ((payslips as unknown as PayslipRecord[]).map((p) => ({
+        ...p,
+        employees: Array.isArray(p.employees) ? p.employees?.[0] ?? null : p.employees,
+      })) as PayslipRecord[])
+    : null;
+
   const { employees, totals } = buildEmployeeIssueSummaries(
-    payslips as PayslipRecord[] | null,
+    normalizedPayslips,
     issueRows as IssueRow[] | null
   );
   const jobs = summarizeJobs(processingJobs as ProcessingJobRow[] | null);

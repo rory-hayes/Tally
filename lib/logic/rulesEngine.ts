@@ -89,7 +89,6 @@ const pushIssue = (
   issues: IssueCandidate[],
   ruleCode: RuleCode,
   context: RuleContext = {},
-  metadata?: Record<string, unknown>,
   severityOverride?: IssueSeverity
 ) => {
   const definition = RULE_DEFINITIONS[ruleCode];
@@ -97,7 +96,6 @@ const pushIssue = (
     ruleCode,
     severity: severityOverride ?? definition.severity,
     description: definition.buildDescription(context),
-    metadata,
   });
 };
 

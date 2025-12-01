@@ -6,10 +6,11 @@ export type RuleCode =
   | "NET_CHANGE_LARGE"
   | "GROSS_CHANGE_LARGE"
   | "TAX_SPIKE_WITHOUT_GROSS"
-  | "USC_SPIKE"
+  | "USC_SPIKE_WITHOUT_GROSS"
   | "YTD_REGRESSION"
   | "PRSI_CATEGORY_CHANGE"
-  | "PENSION_OVER_THRESHOLD";
+  | "PENSION_EMPLOYEE_HIGH"
+  | "PENSION_EMPLOYER_HIGH";
 
 export type IssueCandidate = {
   ruleCode: RuleCode;
@@ -36,7 +37,8 @@ const GROSS_CHANGE_THRESHOLD = 15; // %
 const TAX_SPIKE_THRESHOLD = 20; // %
 const USC_SPIKE_THRESHOLD = 20; // %
 const MAX_GROSS_DELTA_FOR_TAX_SPIKE = 5; // %
-const PENSION_PERCENT_THRESHOLD = 12; // %
+const PENSION_EMPLOYEE_THRESHOLD = 10; // %
+const PENSION_EMPLOYER_THRESHOLD = 12; // %
 
 const RULE_DEFINITIONS: Record<RuleCode, RuleDefinition> = {
   NET_CHANGE_LARGE: {
@@ -58,10 +60,9 @@ const RULE_DEFINITIONS: Record<RuleCode, RuleDefinition> = {
     buildDescription: ({ percentChange }) =>
       `PAYE increased by ${formatPercent(percentChange)} while gross pay stayed flat`,
   },
-  USC_SPIKE: {
+  USC_SPIKE_WITHOUT_GROSS: {
     severity: "warning",
-    buildDescription: ({ percentChange }) =>
-      `USC/NI increased by ${formatPercent(percentChange)} while gross pay stayed flat`,
+    buildDescription: ({ detail }) => detail ?? "USC/NI spike detected",
   },
   YTD_REGRESSION: {
     severity: "critical",
@@ -72,10 +73,13 @@ const RULE_DEFINITIONS: Record<RuleCode, RuleDefinition> = {
     severity: "info",
     buildDescription: ({ detail }) => `PRSI/NI category changed ${detail ?? ""}`.trim(),
   },
-  PENSION_OVER_THRESHOLD: {
+  PENSION_EMPLOYEE_HIGH: {
     severity: "warning",
-    buildDescription: ({ detail, percentChange }) =>
-      `${detail ?? "Pension contribution"} is ${formatPercent(percentChange)} of gross pay`,
+    buildDescription: ({ detail }) => detail ?? "Employee pension contribution is high",
+  },
+  PENSION_EMPLOYER_HIGH: {
+    severity: "info",
+    buildDescription: ({ detail }) => detail ?? "Employer pension contribution is high",
   },
 };
 
@@ -84,6 +88,9 @@ const formatAmount = (value: number | null | undefined) =>
 
 const formatPercent = (value: number | null | undefined) =>
   typeof value === "number" ? `${value.toFixed(1)}%` : "n/a";
+
+const formatSignedPercent = (value: number | null) =>
+  typeof value === "number" ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}%` : "n/a";
 
 const pushIssue = (
   issues: IssueCandidate[],
@@ -102,12 +109,31 @@ const pushIssue = (
 const hasPreviousData = (entry: { previous: number | null }) =>
   typeof entry.previous === "number";
 
-const pensionPercent = (amount: number | null, gross: number | null) => {
-  if (amount === null || gross === null || gross === 0) {
-    return null;
-  }
-  return (amount / gross) * 100;
+const pensionPercent = (amount: number | null, gross: number | null) =>
+  amount !== null && gross && gross !== 0 ? (amount / gross) * 100 : null;
+
+const describeUscSpike = (
+  uscPercent: number | null,
+  uscPrevious: number | null,
+  uscCurrent: number | null,
+  grossPercent: number | null
+) => {
+  const grossDescriptor =
+    grossPercent === null
+      ? "stayed flat"
+      : `changed by ${formatSignedPercent(grossPercent)}`;
+  return `USC/NI increased by ${formatSignedPercent(uscPercent)} (${formatAmount(uscPrevious)} → ${formatAmount(
+    uscCurrent
+  )}) while gross pay ${grossDescriptor}`;
 };
+
+const describePensionPercent = (
+  label: string,
+  percent: number,
+  contribution: number | null | undefined,
+  gross: number | null | undefined
+) =>
+  `${label} is ${percent.toFixed(1)}% of gross pay (${formatAmount(contribution)} / ${formatAmount(gross)})`;
 
 export const runRules = (
   current: PayslipLike,
@@ -161,13 +187,21 @@ export const runRules = (
   if (
     hasPreviousData(diff.usc_or_ni) &&
     diff.usc_or_ni.percentChange !== null &&
-    Math.abs(diff.usc_or_ni.percentChange) >= USC_SPIKE_THRESHOLD &&
-    (diff.gross_pay.percentChange === null ||
-      Math.abs(diff.gross_pay.percentChange) <= MAX_GROSS_DELTA_FOR_TAX_SPIKE)
+    Math.abs(diff.usc_or_ni.percentChange) >= USC_SPIKE_THRESHOLD
   ) {
-    pushIssue(issues, "USC_SPIKE", {
-      percentChange: diff.usc_or_ni.percentChange,
-    });
+    const grossPercent = diff.gross_pay.percentChange;
+    const withinTolerance =
+      grossPercent === null || Math.abs(grossPercent) <= MAX_GROSS_DELTA_FOR_TAX_SPIKE;
+    if (withinTolerance) {
+      pushIssue(issues, "USC_SPIKE_WITHOUT_GROSS", {
+        detail: describeUscSpike(
+          diff.usc_or_ni.percentChange,
+          diff.usc_or_ni.previous,
+          diff.usc_or_ni.current,
+          grossPercent
+        ),
+      });
+    }
   }
 
   // Rule 5: YTD regressions
@@ -194,28 +228,34 @@ export const runRules = (
   // Rule 7: Pension percentage higher than threshold
   const grossCurrent = diff.gross_pay.current ?? null;
   const employeePercent = pensionPercent(current.pension_employee ?? null, grossCurrent);
-  if (employeePercent !== null && employeePercent >= PENSION_PERCENT_THRESHOLD) {
+  if (employeePercent !== null && employeePercent >= PENSION_EMPLOYEE_THRESHOLD) {
     pushIssue(
       issues,
-      "PENSION_OVER_THRESHOLD",
+      "PENSION_EMPLOYEE_HIGH",
       {
-        detail: "Employee pension contribution",
-        percentChange: employeePercent,
+        detail: describePensionPercent(
+          "Employee pension contribution",
+          employeePercent,
+          current.pension_employee,
+          grossCurrent
+        ),
       },
-      "warning"
     );
   }
 
   const employerPercent = pensionPercent(current.pension_employer ?? null, grossCurrent);
-  if (employerPercent !== null && employerPercent >= PENSION_PERCENT_THRESHOLD) {
+  if (employerPercent !== null && employerPercent >= PENSION_EMPLOYER_THRESHOLD) {
     pushIssue(
       issues,
-      "PENSION_OVER_THRESHOLD",
+      "PENSION_EMPLOYER_HIGH",
       {
-        detail: "Employer pension contribution",
-        percentChange: employerPercent,
+        detail: describePensionPercent(
+          "Employer pension contribution",
+          employerPercent,
+          current.pension_employer,
+          grossCurrent
+        ),
       },
-      "info"
     );
   }
 

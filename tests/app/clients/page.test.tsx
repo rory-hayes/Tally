@@ -14,8 +14,16 @@ const mockCreateClient = repoMocks.createClient;
 const mockUpdateClient = repoMocks.updateClient;
 const mockDeleteClient = repoMocks.deleteClient;
 
+const mockRouter = {
+  push: vi.fn(),
+};
+
 vi.mock("@/context/OrganisationContext", () => ({
   useOrganisation: () => ({ organisationId: "org-123", role: "admin" }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => mockRouter,
 }));
 
 vi.mock("@/lib/repositories/clients", () => repoMocks);
@@ -24,13 +32,17 @@ vi.mock("@/components/clients/ClientsTable", () => ({
   ClientsTable: ({
     clients,
     loading,
+    onRowClick,
   }: {
     clients: ClientRow[];
     loading: boolean;
+    onRowClick?: (client: ClientRow) => void;
   }) => (
     <div data-testid="clients-table" data-loading={loading}>
       {clients.map((client) => (
-        <div key={client.id}>{client.name}</div>
+        <div key={client.id} role="row" onClick={() => onRowClick?.(client)}>
+          {client.name}
+        </div>
       ))}
     </div>
   ),
@@ -81,6 +93,7 @@ import { ClientsManager } from "@/app/clients/page";
 describe("ClientsManager workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRouter.push.mockReset();
     mockGetClientsForOrg.mockResolvedValue([]);
   });
 
@@ -156,6 +169,18 @@ describe("ClientsManager workflow", () => {
     await waitFor(() =>
       expect(screen.getByTestId("clients-table")).toHaveTextContent("Omega LLC")
     );
+  });
+
+  it("navigates when a client row is clicked", async () => {
+    mockGetClientsForOrg.mockResolvedValueOnce([
+      { id: "client-7", name: "Delta Ltd", country: "IE", payroll_system: "Sage" },
+    ]);
+
+    render(<ClientsManager />);
+    await waitFor(() => expect(mockGetClientsForOrg).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("row"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/clients/client-7");
   });
 });
 

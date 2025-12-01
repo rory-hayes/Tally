@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card, Space, Typography, Button, message, Spin, Empty, Alert } from "antd";
+import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useOrganisation } from "@/context/OrganisationContext";
@@ -27,6 +28,7 @@ export default function ClientsPage() {
 
 export function ClientsManager() {
   const { organisationId } = useOrganisation();
+  const router = useRouter();
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +152,7 @@ export function ClientsManager() {
             clients={clients}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onRowClick={(client) => router.push(`/clients/${client.id}`)}
           />
         )}
       </Card>

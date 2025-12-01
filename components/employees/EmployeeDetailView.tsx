@@ -40,6 +40,25 @@ const severityColor: Record<IssueSeverity, string> = {
   info: "blue",
 };
 
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+const formatDisplayDate = (dateString?: string | null, fallbackLabel?: string | null) => {
+  if (dateString) {
+    const parsed = new Date(dateString);
+    if (!Number.isNaN(parsed.getTime())) {
+      return dateFormatter.format(parsed);
+    }
+  }
+  if (fallbackLabel) {
+    return fallbackLabel;
+  }
+  return "—";
+};
+
 type EmployeeDetailViewProps = {
   employeeId: string;
   batchId: string;
@@ -65,8 +84,6 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
       percentChange: data.diff[field as keyof typeof data.diff]?.percentChange ?? null,
     }));
   }, [data]);
-
-  const issueItems = data?.issues ?? [];
 
   const buildResolvedTooltip = (issue: (typeof issueItems)[number]) => {
     if (!issue.resolved || !issue.resolved_at) {
@@ -133,6 +150,15 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
     );
   }
 
+  const issueItems = data.issues ?? [];
+  const currentPayDateLabel = formatDisplayDate(
+    data.currentPayslip.pay_date ?? null,
+    data.currentBatchPeriodLabel
+  );
+  const previousPayDateLabel = data.previousPayslip
+    ? formatDisplayDate(data.previousPayslip.pay_date ?? null, data.previousBatchPeriodLabel)
+    : data.previousBatchPeriodLabel ?? "None";
+
   const handleResolve = (issueId: string, resolved: boolean) => {
     if (resolved) {
       toggleIssue(issueId, false);
@@ -157,12 +183,8 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
           {data.employeeRef ?? "No employee ref"} • Batch #{data.batchId}
         </Typography.Text>
         <Descriptions bordered column={2} style={{ marginTop: 16 }}>
-          <Descriptions.Item label="Current pay date">
-            {data.currentPayslip.pay_date ?? "—"}
-          </Descriptions.Item>
-          <Descriptions.Item label="Previous pay date">
-            {data.previousPayslip?.pay_date ?? "None"}
-          </Descriptions.Item>
+          <Descriptions.Item label="Current pay date">{currentPayDateLabel}</Descriptions.Item>
+          <Descriptions.Item label="Previous pay date">{previousPayDateLabel}</Descriptions.Item>
         </Descriptions>
       </Card>
 

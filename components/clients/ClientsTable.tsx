@@ -10,6 +10,7 @@ type ClientsTableProps = {
   clients: ClientRow[];
   onEdit: (client: ClientRow) => void;
   onDelete: (client: ClientRow) => void;
+  onRowClick?: (client: ClientRow) => void;
 };
 
 const columns = (
@@ -21,7 +22,14 @@ const columns = (
     dataIndex: "name",
     key: "name",
     render: (_value, record) => (
-      <Link href={`/clients/${record.id}`}>{record.name}</Link>
+      <Link
+        href={`/clients/${record.id}`}
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
+        {record.name}
+      </Link>
     ),
   },
   {
@@ -48,7 +56,13 @@ const columns = (
     align: "right" as const,
     render: (_value, record) => (
       <>
-        <Button type="link" onClick={() => onEdit(record)}>
+        <Button
+          type="link"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit(record);
+          }}
+        >
           Edit
         </Button>
         <Popconfirm
@@ -58,7 +72,13 @@ const columns = (
           okText="Delete"
           okButtonProps={{ danger: true }}
         >
-          <Button type="link" danger>
+          <Button
+            type="link"
+            danger
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
             Delete
           </Button>
         </Popconfirm>
@@ -72,6 +92,7 @@ export function ClientsTable({
   clients,
   onEdit,
   onDelete,
+  onRowClick,
 }: ClientsTableProps) {
   return (
     <Table<ClientRow>
@@ -80,6 +101,10 @@ export function ClientsTable({
       dataSource={clients}
       columns={columns(onEdit, onDelete)}
       pagination={false}
+      onRow={(record) => ({
+        onClick: () => onRowClick?.(record),
+        style: onRowClick ? { cursor: "pointer" } : undefined,
+      })}
     />
   );
 }

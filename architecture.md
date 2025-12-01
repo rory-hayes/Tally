@@ -144,6 +144,7 @@ Multi-tenancy is enforced via:
      - Resolves/creates `employee`.
      - Inserts `payslips` row.
      - Runs rules to create `issues`.
+       - Current ruleset covers large net/gross changes, PAYE spikes without matching gross changes, USC/NI spikes without gross movement, PRSI/NI category changes, year-to-date regressions, and employee/employer pension contributions breaching configured thresholds.
      - Updates job and `batches.processed_files`.
 
 5. **Completion**

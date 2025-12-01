@@ -58,6 +58,7 @@ describe("ClientsTable", () => {
         clients={[clients[0]]}
         onEdit={vi.fn()}
         onDelete={onDelete}
+        onRowClick={vi.fn()}
       />
     );
 
@@ -75,6 +76,42 @@ describe("ClientsTable", () => {
     fireEvent.click(confirmButton);
 
     expect(onDelete).toHaveBeenCalledWith(clients[0]);
+  });
+
+  it("invokes row click handler when a row is clicked", () => {
+    const handleRowClick = vi.fn();
+    render(
+      <ClientsTable
+        loading={false}
+        clients={clients}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onRowClick={handleRowClick}
+      />
+    );
+
+    const row = screen.getByText("Acme").closest("tr");
+    expect(row).toBeTruthy();
+    fireEvent.click(row!);
+    expect(handleRowClick).toHaveBeenCalledWith(clients[0]);
+  });
+
+  it("does not trigger row click when action buttons are used", () => {
+    const handleRowClick = vi.fn();
+    const onEdit = vi.fn();
+    render(
+      <ClientsTable
+        loading={false}
+        clients={[clients[0]]}
+        onEdit={onEdit}
+        onDelete={vi.fn()}
+        onRowClick={handleRowClick}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+    expect(onEdit).toHaveBeenCalledWith(clients[0]);
+    expect(handleRowClick).not.toHaveBeenCalled();
   });
 });
 

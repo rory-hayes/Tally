@@ -55,26 +55,41 @@ describe("runRules", () => {
     expect(issues.map((i) => i.ruleCode)).toContain("PRSI_CATEGORY_CHANGE");
   });
 
-  it("flags USC spike without gross change", () => {
-    const current = { ...baseCurrent, usc_or_ni: 200, gross_pay: 3050 };
-    const previous = { ...basePrevious, usc_or_ni: 100, gross_pay: 3000 };
+  it("flags USC spike without matching gross change", () => {
+    const current = { ...baseCurrent, usc_or_ni: 220, gross_pay: 3050 };
+    const previous = { ...basePrevious, usc_or_ni: 139.5, gross_pay: 3000 };
     const diff = calculateDiff(previous, current);
     const issues = runRules(current, previous, diff);
-    expect(issues.map((i) => i.ruleCode)).toContain("USC_SPIKE");
+    const uscIssue = issues.find((i) => i.ruleCode === "USC_SPIKE_WITHOUT_GROSS");
+    expect(uscIssue).toBeTruthy();
+    expect(uscIssue?.description).toMatch(/USC\/NI increased by \+57\.7%/i);
+    expect(uscIssue?.description).toMatch(/gross pay changed by \+1\.7%/i);
   });
 
-  it("detects high pension percentage for both employee and employer", () => {
-    const current = { ...baseCurrent, gross_pay: 2000, pension_employee: 400, pension_employer: 320 };
+  it("does not flag USC spike when gross change is comparable", () => {
+    const current = { ...baseCurrent, usc_or_ni: 220, gross_pay: 3600 };
+    const previous = { ...basePrevious, usc_or_ni: 139.5, gross_pay: 3000 };
+    const diff = calculateDiff(previous, current);
+    const issues = runRules(current, previous, diff);
+    expect(issues.map((i) => i.ruleCode)).not.toContain("USC_SPIKE_WITHOUT_GROSS");
+  });
+
+  it("detects high pension percentages for employee and employer", () => {
+    const current = { ...baseCurrent, gross_pay: 3200, pension_employee: 320, pension_employer: 400 };
     const diff = calculateDiff(basePrevious, current);
     const issues = runRules(current, basePrevious, diff);
-    const pensionIssues = issues.filter((i) => i.ruleCode === "PENSION_OVER_THRESHOLD");
-    expect(pensionIssues).toHaveLength(2);
-    expect(pensionIssues.map((issue) => issue.description)).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/Employee pension contribution/),
-        expect.stringMatching(/Employer pension contribution/),
-      ])
-    );
+    const employeeIssue = issues.find((i) => i.ruleCode === "PENSION_EMPLOYEE_HIGH");
+    const employerIssue = issues.find((i) => i.ruleCode === "PENSION_EMPLOYER_HIGH");
+    expect(employeeIssue?.description).toMatch(/10\.0%/);
+    expect(employerIssue?.description).toMatch(/12\.5%/);
+  });
+
+  it("does not flag pension contributions below thresholds", () => {
+    const current = { ...baseCurrent, pension_employee: 200, pension_employer: 200 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff);
+    expect(issues.map((i) => i.ruleCode)).not.toContain("PENSION_EMPLOYEE_HIGH");
+    expect(issues.map((i) => i.ruleCode)).not.toContain("PENSION_EMPLOYER_HIGH");
   });
 
   it("returns empty list when no rules triggered", () => {

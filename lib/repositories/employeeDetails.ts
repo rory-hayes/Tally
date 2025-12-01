@@ -21,6 +21,8 @@ export type EmployeeComparison = {
   employeeRef: string | null;
   batchId: string;
   clientId: string;
+  currentBatchPeriodLabel: string | null;
+  previousBatchPeriodLabel: string | null;
   currentPayslip: PayslipLike & { id: string; pay_date?: string | null };
   previousPayslip: (PayslipLike & { id: string; pay_date?: string | null }) | null;
   diff: PayslipDiff;
@@ -46,7 +48,6 @@ type PayslipRecord = {
   ytd_usc_or_ni?: number | null;
   prsi_or_ni_category?: string | null;
   employees: { name: string | null; external_employee_ref: string | null } | null;
-  issues: IssueRow[] | null;
 };
 
 export async function fetchEmployeeComparison(args: {
@@ -81,16 +82,6 @@ export async function fetchEmployeeComparison(args: {
         employees:employees (
           name,
           external_employee_ref
-        ),
-        issues:issues (
-          id,
-          rule_code,
-          severity,
-          description,
-          resolved,
-          note,
-          resolved_at,
-          resolved_by
         )
       `
     )
@@ -124,16 +115,66 @@ export async function fetchEmployeeComparison(args: {
     currentPayslip as PayslipLike
   );
 
+  const batchIds = Array.from(
+    new Set(
+      [currentPayslip.batch_id, previousPayslip?.batch_id].filter(
+        (value): value is string => typeof value === "string" && value.length > 0
+      )
+    )
+  );
+  const batchPeriodMap = new Map<string, string | null>();
+  if (batchIds.length > 0) {
+    const { data: batchRows, error: batchLookupError } = await supabase
+      .from("batches")
+      .select("id, period_label")
+      .in("id", batchIds);
+
+    if (batchLookupError) {
+      throw new Error(batchLookupError.message);
+    }
+
+    batchRows?.forEach((row) => {
+      batchPeriodMap.set(row.id, row.period_label ?? null);
+    });
+  }
+
+  const { data: issuesData, error: issuesError } = await supabase
+    .from("issues")
+    .select(
+      `
+        id,
+        rule_code,
+        severity,
+        description,
+        resolved,
+        note,
+        resolved_at,
+        resolved_by
+      `
+    )
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId)
+    .eq("employee_id", employeeId)
+    .order("created_at", { ascending: true });
+
+  if (issuesError) {
+    throw new Error(`Failed to load issues: ${issuesError.message}`);
+  }
+
   return {
     employeeId,
     employeeName,
     employeeRef,
     batchId,
     clientId: currentPayslip.client_id,
+    currentBatchPeriodLabel: batchPeriodMap.get(currentPayslip.batch_id) ?? null,
+    previousBatchPeriodLabel: previousPayslip?.batch_id
+      ? batchPeriodMap.get(previousPayslip.batch_id) ?? null
+      : null,
     currentPayslip,
     previousPayslip,
     diff,
-    issues: (currentPayslip.issues ?? []) as IssueRow[],
+    issues: (issuesData ?? []) as IssueRow[],
   };
 }
 

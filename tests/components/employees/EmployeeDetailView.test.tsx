@@ -18,6 +18,8 @@ const sampleComparison = {
   employeeRef: "EMP001",
   batchId: "batch-1",
   clientId: "client-1",
+  currentBatchPeriodLabel: "February 2025",
+  previousBatchPeriodLabel: "January 2025",
   currentPayslip: { id: "cur", net_pay: 2100, gross_pay: 3200, pay_date: "2025-02-28" },
   previousPayslip: { id: "prev", net_pay: 2000, gross_pay: 3000, pay_date: "2025-01-31" },
   diff: {
@@ -45,13 +47,23 @@ const sampleComparison = {
     },
     {
       id: "issue-2",
-      rule_code: "USC_SPIKE",
+      rule_code: "USC_SPIKE_WITHOUT_GROSS",
       severity: "warning",
       description: "USC spiked",
       resolved: true,
       note: null,
       resolved_at: "2025-03-01T10:00:00.000Z",
       resolved_by: "profile-current",
+    },
+    {
+      id: "issue-3",
+      rule_code: "ocr_ingest",
+      severity: "info",
+      description: "OCR ingestion captured 1024 characters",
+      resolved: false,
+      note: null,
+      resolved_at: null,
+      resolved_by: null,
     },
   ],
 };
@@ -66,13 +78,13 @@ describe("EmployeeDetailView", () => {
     });
   });
 
-  it("renders employee summary and diff table", () => {
+  it("renders employee summary, diff table, and formatted pay dates", () => {
     render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getAllByText("Gross pay").length).toBeGreaterThan(0);
     expect(screen.getByText("Issues")).toBeInTheDocument();
-    expect(screen.getByText("2025-02-28")).toBeInTheDocument();
-    expect(screen.getByText("2025-01-31")).toBeInTheDocument();
+    expect(screen.getByText(/February 28, 2025/)).toBeInTheDocument();
+    expect(screen.getByText(/January 31, 2025/)).toBeInTheDocument();
   });
 
   it("opens resolve modal and calls toggleIssue", async () => {
@@ -86,7 +98,8 @@ describe("EmployeeDetailView", () => {
 
     render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /mark as resolved/i }));
+    const resolveButtons = screen.getAllByRole("button", { name: /mark as resolved/i });
+    fireEvent.click(resolveButtons[0]);
 
     fireEvent.change(screen.getByPlaceholderText("Note (optional)"), {
       target: { value: "Checked and OK" },
@@ -103,6 +116,27 @@ describe("EmployeeDetailView", () => {
     const resolved = screen.getByText(/usc spiked/i).closest("span");
     expect(resolved).toHaveClass("ant-typography-secondary");
     expect(resolved?.getAttribute("data-resolved-info")).toMatch(/Resolved by you on/);
+  });
+
+  it("displays info-level issues", () => {
+    render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
+    expect(screen.getByText(/OCR ingestion captured/i)).toBeInTheDocument();
+  });
+
+  it("falls back to batch period when pay date missing", () => {
+    const comparison = {
+      ...sampleComparison,
+      currentPayslip: { ...sampleComparison.currentPayslip, pay_date: null },
+      currentBatchPeriodLabel: "March 2025",
+    };
+    mockUseEmployeeComparison.mockReturnValueOnce({
+      status: "success",
+      data: comparison,
+      error: null,
+      toggleIssue: vi.fn(),
+    });
+    render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
+    expect(screen.getByText(/March 2025/)).toBeInTheDocument();
   });
 });
 

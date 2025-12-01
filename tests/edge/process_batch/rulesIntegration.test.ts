@@ -53,20 +53,16 @@ describe("buildIssuesForPayslip", () => {
     expect(issues.map((issue) => issue.rule_code)).toContain("PRSI_CATEGORY_CHANGE");
   });
 
-  it("EMP003 triggers USC spike", () => {
-    const issues = capture({ usc_or_ni: 200, gross_pay: 3050 }, { usc_or_ni: 100, gross_pay: 3000 });
-    expect(issues.map((issue) => issue.rule_code)).toContain("USC_SPIKE");
+  it("EMP003 triggers USC spike rule", () => {
+    const issues = capture({ usc_or_ni: 220, gross_pay: 3050 }, { usc_or_ni: 139.5, gross_pay: 3000 });
+    const uscIssue = issues.find((issue) => issue.rule_code === "USC_SPIKE_WITHOUT_GROSS");
+    expect(uscIssue?.description).toMatch(/USC\/NI increased by \+57\.7%/i);
   });
 
-  it("EMP005 triggers pension_over_threshold for both EE and ER", () => {
-    const issues = capture({ gross_pay: 2000, pension_employee: 400, pension_employer: 320 }, null);
-    const pensionIssues = issues.filter((issue) => issue.rule_code === "PENSION_OVER_THRESHOLD");
-    expect(pensionIssues).toHaveLength(2);
-    expect(pensionIssues.map((issue) => issue.description)).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/Employee pension contribution/),
-        expect.stringMatching(/Employer pension contribution/),
-      ])
+  it("EMP005 triggers pension threshold rules", () => {
+    const issues = capture({ gross_pay: 3200, pension_employee: 320, pension_employer: 400 }, null);
+    expect(issues.map((issue) => issue.rule_code)).toEqual(
+      expect.arrayContaining(["PENSION_EMPLOYEE_HIGH", "PENSION_EMPLOYER_HIGH"])
     );
   });
 

@@ -1,4 +1,5 @@
 import type { CountryCode, RuleConfig } from "@/lib/rules/types";
+import { getIeConfigForYear } from "@/lib/rules/ieConfig";
 
 type CountryYearKey = string;
 
@@ -15,6 +16,7 @@ const DEFAULT_CONFIGS: Record<CountryYearKey, RuleConfig> = {
     maxGrossDeltaForUscPercent: 5,
     pensionEmployeePercent: 10,
     pensionEmployerPercent: 12,
+    ieConfig: null,
   },
   [buildKey("UK")]: {
     largeNetChangePercent: 15,
@@ -25,6 +27,7 @@ const DEFAULT_CONFIGS: Record<CountryYearKey, RuleConfig> = {
     maxGrossDeltaForUscPercent: 5,
     pensionEmployeePercent: 10,
     pensionEmployerPercent: 12,
+    ieConfig: null,
   },
 };
 
@@ -33,10 +36,20 @@ export const getDefaultRuleConfig = (
   taxYear?: number | null
 ): RuleConfig => {
   const exact = DEFAULT_CONFIGS[buildKey(country, taxYear)];
-  if (exact) return exact;
   const fallback = DEFAULT_CONFIGS[buildKey(country)];
-  if (fallback) return fallback;
-  return DEFAULT_CONFIGS[buildKey("IE")];
+  const base = exact ?? fallback ?? DEFAULT_CONFIGS[buildKey("IE")];
+  const cloned: RuleConfig = { ...base, ieConfig: base.ieConfig ?? null };
+
+  if (country === "IE") {
+    try {
+      cloned.ieConfig = getIeConfigForYear(taxYear);
+    } catch (err) {
+      console.warn("[rules] Missing IE config for year", taxYear, err);
+      cloned.ieConfig = null;
+    }
+  }
+
+  return cloned;
 };
 
 export const mergeRuleConfig = (

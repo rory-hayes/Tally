@@ -1,4 +1,5 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
+import type { IeTaxYearConfig } from "@/lib/rules/ieConfig";
 
 export type IssueSeverity = "info" | "warning" | "critical";
 
@@ -53,5 +54,6 @@ export type RuleConfig = {
   maxGrossDeltaForUscPercent: number;
   pensionEmployeePercent: number;
   pensionEmployerPercent: number;
+  ieConfig?: IeTaxYearConfig | null;
 };
 

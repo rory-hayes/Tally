@@ -27,6 +27,7 @@ export type RuleEvaluationContext = {
   diff: PayslipDiff;
   country: CountryCode;
   taxYear: number | null;
+  config: RuleConfig;
 };
 
 export type RuleEvaluationOutcome = {
@@ -39,4 +40,15 @@ export type RuleEvaluationResult =
   | undefined
   | RuleEvaluationOutcome
   | RuleEvaluationOutcome[];
+
+export type RuleConfig = {
+  largeNetChangePercent: number;
+  largeGrossChangePercent: number;
+  payeSpikePercent: number;
+  uscSpikePercent: number;
+  maxGrossDeltaPercent: number;
+  maxGrossDeltaForUscPercent: number;
+  pensionEmployeePercent: number;
+  pensionEmployerPercent: number;
+};
 

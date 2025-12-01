@@ -170,6 +170,7 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
 - `lib/rules/registry.ts` exports:
   - `RuleDefinition` objects describing rule metadata (`code`, `severity`, `categories`, `descriptionTemplate`, applicability by `country`/`tax_year`).
   - `getActiveRules(country, taxYear)` which filters the registry for the current payslip context.
+- **Rule configuration**: Thresholds live in `RuleConfig` objects loaded via `lib/rules/config.ts`. Defaults are keyed by country + tax year, while bureau/client overrides are stored in `client_rule_config` (JSONB). The processing pipeline merges overrides with defaults and passes the resulting config into every rule evaluation so thresholds can vary per client without new deployments.
 - Each rule definition provides an `evaluate(context)` function (pure) that inspects the current/previous payslip diff and returns zero or more `IssueCandidate`s.
 - `runRules(current, previous, diff, options)` simply fetches the active rule pack and executes each definition. Adding a new rule requires only appending a `RuleDefinition` entry; engine code stays unchanged.
 - Countries / tax years default to `IE` / derived from payslip `pay_date`, but clients can extend coverage by adding new definitions or packs.

@@ -5,6 +5,10 @@ import {
   type IssueSeverity,
   type RuleCode,
 } from "../../../lib/logic/rulesEngine.ts";
+import type {
+  CountryCode,
+  RuleConfig,
+} from "../../../lib/rules/types.ts";
 
 export const PAYSLIP_SELECT_FIELDS =
   "id, organisation_id, client_id, batch_id, employee_id, pay_date, gross_pay, net_pay, paye, usc_or_ni, pension_employee, pension_employer, ytd_gross, ytd_net, ytd_tax, ytd_usc_or_ni, prsi_or_ni_category, clients:clients (country)";
@@ -33,19 +37,32 @@ export type IssueInsertRow = {
 
 export { type IssueSeverity, type RuleCode, type IssueCandidate };
 
+type BuildIssuesOptions = {
+  country?: CountryCode | null;
+  taxYear?: number | null;
+  config?: RuleConfig;
+};
+
 export const buildIssuesForPayslip = (
   current: PayslipForRules,
-  previous: PayslipForRules | null
+  previous: PayslipForRules | null,
+  options?: BuildIssuesOptions
 ): IssueInsertRow[] => {
   const diff = calculateDiff(previous, current);
-  const payYear = current.pay_date ? new Date(current.pay_date).getUTCFullYear() : undefined;
-  const country =
-    (current.clients && !Array.isArray(current.clients) ? current.clients?.country : null) ??
-    undefined;
+  const fallbackTaxYear = current.pay_date
+    ? new Date(current.pay_date).getUTCFullYear()
+    : null;
+  const fallbackCountry =
+    (current.clients && !Array.isArray(current.clients)
+      ? (current.clients?.country as CountryCode | null)
+      : null) ?? null;
+  const country = options?.country ?? fallbackCountry ?? ("IE" as CountryCode);
+  const taxYear = options?.taxYear ?? fallbackTaxYear ?? null;
 
   const issues = runRules(current, previous, diff, {
-    country: country ?? undefined,
-    taxYear: payYear,
+    country,
+    taxYear: taxYear ?? undefined,
+    config: options?.config,
   });
 
   return issues.map((issue) => ({

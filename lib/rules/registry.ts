@@ -20,15 +20,6 @@ export type RuleDefinition = {
   evaluate: (context: RuleEvaluationContext) => RuleEvaluationResult;
 };
 
-const NET_CHANGE_THRESHOLD = 15; // %
-const GROSS_CHANGE_THRESHOLD = 15; // %
-const TAX_SPIKE_THRESHOLD = 20; // %
-const USC_SPIKE_THRESHOLD = 20; // %
-const MAX_GROSS_DELTA_FOR_TAX_SPIKE = 5; // %
-const MAX_GROSS_DELTA_FOR_USC_SPIKE = 5; // %
-const PENSION_EMPLOYEE_THRESHOLD = 10; // %
-const PENSION_EMPLOYER_THRESHOLD = 12; // %
-
 const COUNTRY_ALL: CountryCode[] = ["IE", "UK"];
 
 const formatAmount = (value: number | null | undefined) =>
@@ -84,10 +75,10 @@ const baseRuleDefinitions: RuleDefinition[] = [
     severity: "warning",
     categories: ["net"],
     appliesTo: { countries: COUNTRY_ALL },
-    evaluate: ({ diff }) => {
+    evaluate: ({ diff, config }) => {
       const entry = diff.net_pay;
       if (!hasPreviousData(entry) || entry.percentChange === null) return null;
-      if (Math.abs(entry.percentChange) < NET_CHANGE_THRESHOLD) return null;
+      if (Math.abs(entry.percentChange) < config.largeNetChangePercent) return null;
       return applyIssue(
         `Net pay changed by ${formatPercent(entry.percentChange)} (${formatAmount(
           entry.previous
@@ -101,10 +92,10 @@ const baseRuleDefinitions: RuleDefinition[] = [
     severity: "warning",
     categories: ["gross"],
     appliesTo: { countries: COUNTRY_ALL },
-    evaluate: ({ diff }) => {
+    evaluate: ({ diff, config }) => {
       const entry = diff.gross_pay;
       if (!hasPreviousData(entry) || entry.percentChange === null) return null;
-      if (Math.abs(entry.percentChange) < GROSS_CHANGE_THRESHOLD) return null;
+      if (Math.abs(entry.percentChange) < config.largeGrossChangePercent) return null;
       return applyIssue(
         `Gross pay changed by ${formatPercent(entry.percentChange)} (${formatAmount(
           entry.previous
@@ -118,12 +109,15 @@ const baseRuleDefinitions: RuleDefinition[] = [
     severity: "warning",
     categories: ["tax"],
     appliesTo: { countries: COUNTRY_ALL },
-    evaluate: ({ diff }) => {
+    evaluate: ({ diff, config }) => {
       const entry = diff.paye;
       if (!hasPreviousData(entry) || entry.percentChange === null) return null;
-      if (Math.abs(entry.percentChange) < TAX_SPIKE_THRESHOLD) return null;
+      if (Math.abs(entry.percentChange) < config.payeSpikePercent) return null;
       const grossPercent = diff.gross_pay.percentChange;
-      if (grossPercent !== null && Math.abs(grossPercent) > MAX_GROSS_DELTA_FOR_TAX_SPIKE) {
+      if (
+        grossPercent !== null &&
+        Math.abs(grossPercent) > config.maxGrossDeltaPercent
+      ) {
         return null;
       }
       return applyIssue(
@@ -137,12 +131,15 @@ const baseRuleDefinitions: RuleDefinition[] = [
     severity: "warning",
     categories: ["tax"],
     appliesTo: { countries: COUNTRY_ALL },
-    evaluate: ({ diff }) => {
+    evaluate: ({ diff, config }) => {
       const entry = diff.usc_or_ni;
       if (!hasPreviousData(entry) || entry.percentChange === null) return null;
-      if (Math.abs(entry.percentChange) < USC_SPIKE_THRESHOLD) return null;
+      if (Math.abs(entry.percentChange) < config.uscSpikePercent) return null;
       const grossPercent = diff.gross_pay.percentChange;
-      if (grossPercent !== null && Math.abs(grossPercent) > MAX_GROSS_DELTA_FOR_USC_SPIKE) {
+      if (
+        grossPercent !== null &&
+        Math.abs(grossPercent) > config.maxGrossDeltaForUscPercent
+      ) {
         return null;
       }
       return applyIssue(
@@ -198,13 +195,13 @@ const baseRuleDefinitions: RuleDefinition[] = [
     severity: "warning",
     categories: ["pension"],
     appliesTo: { countries: COUNTRY_ALL },
-    evaluate: ({ current, diff }) => {
+    evaluate: ({ current, diff, config }) => {
       const grossCurrent = diff.gross_pay.current ?? null;
       if (!grossCurrent || grossCurrent === 0) return null;
       const pension = current.pension_employee ?? null;
       if (typeof pension !== "number") return null;
       const percent = (pension / grossCurrent) * 100;
-      if (percent < PENSION_EMPLOYEE_THRESHOLD) {
+      if (percent < config.pensionEmployeePercent) {
         return null;
       }
       return applyIssue(
@@ -218,13 +215,13 @@ const baseRuleDefinitions: RuleDefinition[] = [
     severity: "info",
     categories: ["pension"],
     appliesTo: { countries: COUNTRY_ALL },
-    evaluate: ({ current, diff }) => {
+    evaluate: ({ current, diff, config }) => {
       const grossCurrent = diff.gross_pay.current ?? null;
       if (!grossCurrent || grossCurrent === 0) return null;
       const pension = current.pension_employer ?? null;
       if (typeof pension !== "number") return null;
       const percent = (pension / grossCurrent) * 100;
-      if (percent < PENSION_EMPLOYER_THRESHOLD) {
+      if (percent < config.pensionEmployerPercent) {
         return null;
       }
       return applyIssue(

@@ -5,6 +5,7 @@ import {
   __dangerousSetRuleDefinitionsForTesting,
   type RuleDefinition,
 } from "@/lib/rules/registry";
+import { getDefaultRuleConfig } from "@/lib/rules/config";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -25,7 +26,11 @@ const baseCurrent = {
   usc_or_ni: 139.5,
 };
 
-const defaultOptions = { country: "IE" as const, taxYear: 2025 };
+const defaultOptions = {
+  country: "IE" as const,
+  taxYear: 2025,
+  config: getDefaultRuleConfig("IE"),
+};
 
 describe("runRules", () => {
   it("flags large net change", () => {
@@ -40,6 +45,20 @@ describe("runRules", () => {
     const diff = calculateDiff(basePrevious, current);
     const issues = runRules(current, basePrevious, diff, defaultOptions);
     expect(issues.map((i) => i.ruleCode)).toContain("GROSS_CHANGE_LARGE");
+  });
+
+  it("respects client-specific thresholds via config", () => {
+    const relaxedConfig = {
+      ...defaultOptions.config!,
+      largeNetChangePercent: 40,
+    };
+    const current = { ...baseCurrent, net_pay: 2600 }; // ~24% increase
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      ...defaultOptions,
+      config: relaxedConfig,
+    });
+    expect(issues.map((i) => i.ruleCode)).not.toContain("NET_CHANGE_LARGE");
   });
 
   it("flags tax spike without gross change", () => {
@@ -80,6 +99,25 @@ describe("runRules", () => {
     const diff = calculateDiff(previous, current);
     const issues = runRules(current, previous, diff, defaultOptions);
     expect(issues.map((i) => i.ruleCode)).not.toContain("USC_SPIKE_WITHOUT_GROSS");
+  });
+
+  it("flags spikes again when override tightens tolerance", () => {
+    const previous = { ...basePrevious, usc_or_ni: 140 };
+    const current = { ...baseCurrent, usc_or_ni: 152, gross_pay: 3050 };
+    const diff = calculateDiff(previous, current);
+    const strictConfig = {
+      ...defaultOptions.config!,
+      uscSpikePercent: 5,
+      maxGrossDeltaForUscPercent: 10,
+    };
+    const defaultIssues = runRules(current, previous, diff, defaultOptions);
+    expect(defaultIssues.map((i) => i.ruleCode)).not.toContain("USC_SPIKE_WITHOUT_GROSS");
+
+    const issues = runRules(current, previous, diff, {
+      ...defaultOptions,
+      config: strictConfig,
+    });
+    expect(issues.map((i) => i.ruleCode)).toContain("USC_SPIKE_WITHOUT_GROSS");
   });
 
   it("detects high pension percentages for employee and employer with readable description", () => {

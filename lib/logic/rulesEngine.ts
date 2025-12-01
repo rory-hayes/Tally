@@ -1,4 +1,5 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
+import { getDefaultRuleConfig } from "@/lib/rules/config";
 import { getActiveRules } from "@/lib/rules/registry";
 import type {
   CountryCode,
@@ -6,11 +7,13 @@ import type {
   IssueSeverity,
   RuleCode,
   RuleEvaluationOutcome,
+  RuleConfig,
 } from "@/lib/rules/types";
 
 export type RuleRuntimeOptions = {
   country?: CountryCode;
   taxYear?: number;
+  config?: RuleConfig;
 };
 
 export type { IssueCandidate, IssueSeverity, RuleCode } from "@/lib/rules/types";
@@ -32,6 +35,8 @@ export const runRules = (
   const derivedCountry = options.country ?? ("IE" as CountryCode);
   const derivedTaxYear =
     typeof options.taxYear === "number" ? options.taxYear : null;
+  const derivedConfig =
+    options.config ?? getDefaultRuleConfig(derivedCountry, derivedTaxYear);
 
   const activeRules = getActiveRules(derivedCountry, derivedTaxYear);
 
@@ -43,6 +48,7 @@ export const runRules = (
         diff,
         country: derivedCountry,
         taxYear: derivedTaxYear,
+        config: derivedConfig,
       })
     );
 

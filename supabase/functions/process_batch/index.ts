@@ -18,6 +18,11 @@ import {
   buildIssuesForPayslip,
   type PayslipForRules,
 } from "./rules.ts";
+import {
+  getDefaultRuleConfig,
+  mergeRuleConfig,
+} from "../../../lib/rules/config.ts";
+import type { CountryCode, RuleConfig } from "../../../lib/rules/types.ts";
 
 type JobRow = {
   id: string;
@@ -310,7 +315,25 @@ async function insertRuleIssues(
   currentPayslip: PayslipForRules,
   previousPayslip: PayslipForRules | null
 ) {
-  const rows = buildIssuesForPayslip(currentPayslip, previousPayslip);
+  const country =
+    (currentPayslip.clients && !Array.isArray(currentPayslip.clients)
+      ? (currentPayslip.clients?.country as CountryCode | null)
+      : null) ?? null;
+  const taxYear = currentPayslip.pay_date
+    ? new Date(currentPayslip.pay_date).getUTCFullYear()
+    : null;
+  const config = await loadRuleConfigForClient(
+    supabase,
+    currentPayslip.organisation_id,
+    currentPayslip.client_id,
+    country,
+    taxYear
+  );
+  const rows = buildIssuesForPayslip(currentPayslip, previousPayslip, {
+    country,
+    taxYear,
+    config,
+  });
   if (!rows.length) return;
   const { error } = await supabase.from("issues").insert(rows);
   if (error) {
@@ -384,5 +407,36 @@ async function fetchBatchMeta(
     period_label: data.period_label ?? null,
     created_at: data.created_at ?? null,
   };
+}
+
+type ClientRuleConfigRow = {
+  config: Partial<RuleConfig> | null;
+};
+
+async function loadRuleConfigForClient(
+  supabase: ReturnType<typeof createClient>,
+  organisationId: string,
+  clientId: string,
+  country: CountryCode | null,
+  taxYear: number | null
+): Promise<RuleConfig> {
+  const derivedCountry = country ?? ("IE" as CountryCode);
+  const baseConfig = getDefaultRuleConfig(derivedCountry, taxYear);
+
+  const { data, error } = await supabase
+    .from("client_rule_config")
+    .select("config")
+    .eq("organisation_id", organisationId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    throw new Error(
+      error.message ?? "Unable to load client rule configuration overrides"
+    );
+  }
+
+  const override = (data as ClientRuleConfigRow | null)?.config ?? null;
+  return mergeRuleConfig(baseConfig, override);
 }
 

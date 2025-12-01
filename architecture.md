@@ -174,6 +174,24 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
 - Each rule definition provides an `evaluate(context)` function (pure) that inspects the current/previous payslip diff and returns zero or more `IssueCandidate`s.
 - `runRules(current, previous, diff, options)` simply fetches the active rule pack and executes each definition. Adding a new rule requires only appending a `RuleDefinition` entry; engine code stays unchanged.
 - Countries / tax years default to `IE` / derived from payslip `pay_date`, but clients can extend coverage by adding new definitions or packs.
+- **Severity model**:
+  - `info`: informational anomalies that highlight changes needing human awareness but rarely require immediate remediation (e.g., PRSI/NI category changes, OCR ingestion logging).
+  - `warning`: financially relevant anomalies that should be reviewed promptly but usually indicate configuration or data-entry issues (net/gross delta, PAYE/USC spikes, pension thresholds).
+  - `critical`: high-risk anomalies that almost always point to incorrect payroll outcomes (e.g., YTD regressions reducing statutory totals).
+  - Current rules and severities:
+
+    | Rule code | Severity | Rationale |
+    |-----------|----------|-----------|
+    | `NET_CHANGE_LARGE` | warning | Material change to take-home pay |
+    | `GROSS_CHANGE_LARGE` | warning | Material change to gross earnings |
+    | `TAX_SPIKE_WITHOUT_GROSS` | warning | Tax spike while gross is flat |
+    | `USC_SPIKE_WITHOUT_GROSS` | warning | USC/NI spike while gross is flat |
+    | `YTD_REGRESSION` | critical | Statutory totals decreasing between periods |
+    | `PRSI_CATEGORY_CHANGE` | info | Compliance metadata change needing awareness |
+    | `PENSION_EMPLOYEE_HIGH` | warning | Employee pension exceeding configured % |
+    | `PENSION_EMPLOYER_HIGH` | info | Employer pension above threshold |
+
+- **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.
 
 This layout keeps the business logic declarative and testable (registry tests ensure filtering works by country/year, and `runRules` integration tests verify that newly registered rules are automatically executed).
 

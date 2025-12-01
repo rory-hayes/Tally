@@ -24,6 +24,7 @@ import { uploadBatchFiles } from "@/lib/storage/batchUploads";
 import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
 import { downloadBatchIssuesCsv } from "@/lib/functions/downloadBatchIssuesCsv";
 import { BatchReportModal } from "@/components/batches/BatchReportModal";
+import { logAuditEvent } from "@/lib/repositories/auditLogs";
 
 type BatchDetailViewProps = {
   batchId: string;
@@ -36,7 +37,7 @@ const severityColors: Record<IssueSeverity, string> = {
 };
 
 export function BatchDetailView({ batchId }: BatchDetailViewProps) {
-  const { organisationId } = useOrganisation();
+  const { organisationId, profileId } = useOrganisation();
   const { status, data, error, refresh } = useBatchDetail(batchId);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -89,6 +90,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       message.warning("Select at least one file to upload.");
       return;
     }
+    const actorId = profileId ?? "system";
 
     const rcFiles = fileList
       .map((file) => file.originFileObj)
@@ -108,6 +110,17 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       });
       await invokeCreateProcessingJobs(batch.id);
       message.success(`${files.length} file(s) uploaded and queued for processing.`);
+      await logAuditEvent({
+        organisationId,
+        actorId,
+        action: "payslips_uploaded",
+        metadata: {
+          batchId: batch.id,
+          fileCount: files.length,
+          clientId: batch.client_id,
+          fileNames: files.map((file) => file.name),
+        },
+      });
       setFileList([]);
       await refresh();
     } catch (err) {

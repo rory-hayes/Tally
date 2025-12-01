@@ -53,6 +53,7 @@ export function RequireAuth({ children }: PropsWithChildren) {
         status: "ready",
         profile: {
           organisationId,
+          profileId: profile.id,
           role: profile.role,
         },
       });

@@ -11,6 +11,10 @@ const repoMocks = vi.hoisted(() => ({
   getBatchById: vi.fn(),
 }));
 
+const auditMocks = vi.hoisted(() => ({
+  logAuditEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/lib/repositories/clients", () => ({
   getClientById: repoMocks.getClientById,
 }));
@@ -22,8 +26,14 @@ vi.mock("@/lib/repositories/batches", () => ({
 }));
 
 vi.mock("@/context/OrganisationContext", () => ({
-  useOrganisation: () => ({ organisationId: "org-123", role: "admin" }),
+  useOrganisation: () => ({
+    organisationId: "org-123",
+    profileId: "profile-1",
+    role: "admin",
+  }),
 }));
+
+vi.mock("@/lib/repositories/auditLogs", () => auditMocks);
 
 const mockRouter = {
   push: vi.fn(),
@@ -83,6 +93,7 @@ const emptyBatchList: BatchRow[] = [];
 describe("ClientDetailContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auditMocks.logAuditEvent.mockClear();
     repoMocks.getClientById.mockResolvedValue({ ...clientFixture });
     repoMocks.getBatchesForClient.mockResolvedValue(emptyBatchList);
     repoMocks.getBatchById.mockResolvedValue({ ...batchFixture });
@@ -131,6 +142,17 @@ describe("ClientDetailContent", () => {
         status: "pending",
       })
     );
+
+    expect(auditMocks.logAuditEvent).toHaveBeenCalledWith({
+      organisationId: "org-123",
+      actorId: "profile-1",
+      action: "batch_created",
+      metadata: {
+        batchId: batchFixture.id,
+        clientId: "client-123",
+        periodLabel: "Jan 2025",
+      },
+    });
 
     await waitFor(() =>
       expect(

@@ -9,6 +9,7 @@ import {
 
 export type OrganisationContextValue = {
   organisationId: string;
+  profileId: string;
   role: string;
 };
 
@@ -18,7 +19,10 @@ export function OrganisationProvider({
   value,
   children,
 }: PropsWithChildren<{ value: OrganisationContextValue }>) {
-  const memoized = useMemo(() => value, [value.organisationId, value.role]);
+  const memoized = useMemo(
+    () => value,
+    [value.organisationId, value.profileId, value.role]
+  );
   return (
     <OrganisationContext.Provider value={memoized}>
       {children}

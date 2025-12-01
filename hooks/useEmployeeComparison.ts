@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchEmployeeComparison, updateIssueResolution, type EmployeeComparison } from "@/lib/repositories/employeeDetails";
+import {
+  fetchEmployeeComparison,
+  updateIssueResolution,
+  type EmployeeComparison,
+} from "@/lib/repositories/employeeDetails";
 import { useOrganisation } from "@/context/OrganisationContext";
 
 export type EmployeeComparisonState =
@@ -11,7 +15,7 @@ export type EmployeeComparisonState =
   | { status: "error"; data: EmployeeComparison | null; error: string };
 
 export function useEmployeeComparison(employeeId: string, batchId: string) {
-  const { organisationId } = useOrganisation();
+  const { organisationId, profileId } = useOrganisation();
   const [state, setState] = useState<EmployeeComparisonState>({
     status: "idle",
     data: null,
@@ -45,10 +49,23 @@ export function useEmployeeComparison(employeeId: string, batchId: string) {
 
   const toggleIssue = useCallback(
     async (issueId: string, resolved: boolean, note?: string | null) => {
-      await updateIssueResolution({ issueId, resolved, note });
+      const comparison = state.data;
+      await updateIssueResolution({
+        issueId,
+        resolved,
+        note,
+        audit: comparison
+          ? {
+              organisationId,
+              actorId: profileId,
+              batchId: comparison.batchId,
+              employeeId: comparison.employeeId,
+            }
+          : undefined,
+      });
       await load();
     },
-    [load]
+    [state, organisationId, profileId, load]
   );
 
   return { ...state, reload: load, toggleIssue };

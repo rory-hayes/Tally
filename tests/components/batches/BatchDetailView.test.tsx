@@ -1,33 +1,45 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, beforeEach } from "vitest";
 import { BatchDetailView } from "@/components/batches/BatchDetailView";
 
 const mockUseBatchDetail = vi.fn();
 const downloadCsvMock = vi.fn().mockResolvedValue(undefined);
+const uploadBatchFilesMock = vi.fn().mockResolvedValue(undefined);
+const updateBatchStatusMock = vi.fn().mockResolvedValue(undefined);
+const invokeProcessingMock = vi.fn().mockResolvedValue(undefined);
+const logAuditMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/hooks/useBatchDetail", () => ({
   useBatchDetail: () => mockUseBatchDetail(),
 }));
 
 vi.mock("@/context/OrganisationContext", () => ({
-  useOrganisation: () => ({ organisationId: "org-123", role: "admin" }),
+  useOrganisation: () => ({
+    organisationId: "org-123",
+    profileId: "profile-1",
+    role: "admin",
+  }),
 }));
 
 vi.mock("@/lib/repositories/batches", () => ({
-  updateBatchStatus: vi.fn(),
+  updateBatchStatus: (...args: unknown[]) => updateBatchStatusMock(...args),
 }));
 
 vi.mock("@/lib/storage/batchUploads", () => ({
-  uploadBatchFiles: vi.fn(),
+  uploadBatchFiles: (...args: unknown[]) => uploadBatchFilesMock(...args),
 }));
 
 vi.mock("@/lib/functions/createProcessingJobs", () => ({
-  invokeCreateProcessingJobs: vi.fn(),
+  invokeCreateProcessingJobs: (...args: unknown[]) => invokeProcessingMock(...args),
 }));
 
 vi.mock("@/lib/functions/downloadBatchIssuesCsv", () => ({
   downloadBatchIssuesCsv: (...args: unknown[]) => downloadCsvMock(...args),
+}));
+
+vi.mock("@/lib/repositories/auditLogs", () => ({
+  logAuditEvent: (...args: unknown[]) => logAuditMock(...args),
 }));
 
 vi.mock("@/components/batches/BatchReportModal", () => ({
@@ -38,6 +50,31 @@ vi.mock("@/components/batches/BatchReportModal", () => ({
       </div>
     ) : null,
 }));
+
+const draggerHandle: { beforeUpload?: (file: unknown) => unknown } = {};
+
+vi.mock("antd", async () => {
+  const actual = await vi.importActual<typeof import("antd")>("antd");
+  const MockDragger = (props: any) => {
+    draggerHandle.beforeUpload = props.beforeUpload;
+    return (
+      <div data-testid="upload-dragger">
+        {props.children}
+      </div>
+    );
+  };
+  return {
+    ...actual,
+    Upload: {
+      Dragger: MockDragger,
+    },
+    message: {
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+    },
+  };
+});
 
 vi.mock("next/link", () => ({
   __esModule: true,
@@ -88,13 +125,22 @@ const sampleDetail = {
   },
 };
 
+let refreshMock: ReturnType<typeof vi.fn>;
+
 describe("BatchDetailView", () => {
   beforeEach(() => {
+    uploadBatchFilesMock.mockClear();
+    updateBatchStatusMock.mockClear();
+    invokeProcessingMock.mockClear();
+    logAuditMock.mockClear();
+    downloadCsvMock.mockClear();
+    draggerHandle.beforeUpload = undefined;
+    refreshMock = vi.fn().mockResolvedValue(undefined);
     mockUseBatchDetail.mockReturnValue({
       status: "success",
       data: sampleDetail,
       error: null,
-      refresh: vi.fn(),
+      refresh: refreshMock,
     });
   });
 
@@ -150,27 +196,27 @@ describe("BatchDetailView", () => {
 
   it("renders Empty state when no employees", () => {
     mockUseBatchDetail.mockReturnValue({
-        status: "success",
-        data: {
-          ...sampleDetail,
-          employees: [],
-          totals: { employeesProcessed: 0, critical: 0, warning: 0, info: 0 },
-        },
-        error: null,
-        refresh: vi.fn(),
-      });
-
-      render(<BatchDetailView batchId="batch-1" />);
-      expect(screen.getByText(/No employees processed yet/i)).toBeInTheDocument();
+      status: "success",
+      data: {
+        ...sampleDetail,
+        employees: [],
+        totals: { employeesProcessed: 0, critical: 0, warning: 0, info: 0 },
+      },
+      error: null,
+      refresh: vi.fn(),
     });
 
-    it("disables upload button when no files selected", () => {
-      render(<BatchDetailView batchId="batch-1" />);
-      const uploadButton = screen.getByRole("button", { name: /upload files/i });
-      expect(uploadButton).toBeDisabled();
-    });
+    render(<BatchDetailView batchId="batch-1" />);
+    expect(screen.getByText(/No employees processed yet/i)).toBeInTheDocument();
+  });
 
-    it("shows processing summary text when provided", () => {
+  it("disables upload button when no files selected", () => {
+    render(<BatchDetailView batchId="batch-1" />);
+    const uploadButton = screen.getByRole("button", { name: /upload files/i });
+    expect(uploadButton).toBeDisabled();
+  });
+
+  it("shows processing summary text when provided", () => {
     const detailWithProgress = {
       ...sampleDetail,
       batch: { ...sampleDetail.batch, processed_files: 1, total_files: 3 },
@@ -186,7 +232,7 @@ describe("BatchDetailView", () => {
     render(<BatchDetailView batchId="batch-1" />);
     expect(screen.getByText(/1\/3 files processed/i)).toBeInTheDocument();
     expect(screen.getByText(/processing in progress/i)).toBeInTheDocument();
-    });
+  });
 
   it("shows failed job details when jobs fail", () => {
     mockUseBatchDetail.mockReturnValue({
@@ -233,6 +279,36 @@ describe("BatchDetailView", () => {
     if (originalDescriptor) {
       Object.defineProperty(document, "visibilityState", originalDescriptor);
     }
+  });
+  it("logs audit event after uploading files", async () => {
+    render(<BatchDetailView batchId="batch-1" />);
+
+    await act(async () => {
+      draggerHandle.beforeUpload?.({
+        uid: "file-1",
+        name: "Jan.pdf",
+        size: 1234,
+        type: "application/pdf",
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /upload files/i }));
+
+    await waitFor(() =>
+      expect(uploadBatchFilesMock).toHaveBeenCalledWith("batch-1", expect.any(Array))
+    );
+    expect(logAuditMock).toHaveBeenCalledWith({
+      organisationId: "org-123",
+      actorId: "profile-1",
+      action: "payslips_uploaded",
+      metadata: {
+        batchId: "batch-1",
+        clientId: "client-1",
+        fileCount: 1,
+        fileNames: ["Jan.pdf"],
+      },
+    });
+    await waitFor(() => expect(refreshMock).toHaveBeenCalled());
   });
 });
 

@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { calculateDiff, type PayslipLike, type PayslipDiff } from "@/lib/logic/payslipDiff";
+import { logAuditEvent } from "@/lib/repositories/auditLogs";
 
 export type IssueSeverity = "critical" | "warning" | "info";
 
@@ -136,9 +137,15 @@ export async function updateIssueResolution(args: {
   issueId: string;
   resolved: boolean;
   note?: string | null;
+  audit?: {
+    organisationId: string;
+    actorId: string;
+    batchId: string;
+    employeeId: string;
+  };
 }) {
   const supabase = getSupabaseBrowserClient();
-  const { issueId, resolved, note } = args;
+  const { issueId, resolved, note, audit } = args;
   const { error } = await supabase
     .from("issues")
     .update({
@@ -150,6 +157,20 @@ export async function updateIssueResolution(args: {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (audit) {
+    await logAuditEvent({
+      organisationId: audit.organisationId,
+      actorId: audit.actorId,
+      action: resolved ? "issue_resolved" : "issue_unresolved",
+      metadata: {
+        issueId,
+        batchId: audit.batchId,
+        employeeId: audit.employeeId,
+        note: note ?? null,
+      },
+    });
   }
 }
 

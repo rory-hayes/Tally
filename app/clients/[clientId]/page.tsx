@@ -17,15 +17,9 @@ import type { ColumnsType } from "antd/es/table";
 import AppLayout from "@/components/layout/AppLayout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useOrganisation } from "@/context/OrganisationContext";
-import {
-  ClientRow,
-  getClientById,
-} from "@/lib/repositories/clients";
-import {
-  BatchRow,
-  createBatchForClient,
-  getBatchesForClient,
-} from "@/lib/repositories/batches";
+import { ClientRow, getClientById } from "@/lib/repositories/clients";
+import { BatchRow, createBatchForClient, getBatchesForClient } from "@/lib/repositories/batches";
+import { logAuditEvent } from "@/lib/repositories/auditLogs";
 import { CreateBatchModal } from "@/components/batches/CreateBatchModal";
 
 const statusColorMap: Record<string, string> = {
@@ -104,7 +98,7 @@ type ClientDetailContentProps = {
 
 export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
   const router = useRouter();
-  const { organisationId } = useOrganisation();
+  const { organisationId, profileId } = useOrganisation();
   const [client, setClient] = useState<ClientRow | null>(null);
   const [clientLoading, setClientLoading] = useState(true);
   const [batches, setBatches] = useState<BatchRow[]>([]);
@@ -155,6 +149,7 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
     notes?: string | null;
   }) => {
     try {
+      const actorId = profileId ?? "system";
       const newBatch = await createBatchForClient(organisationId, {
         clientId,
         periodLabel: values.periodLabel,
@@ -166,6 +161,16 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
       setBatches((prev) => [newBatch, ...prev]);
       setModalOpen(false);
       message.success("Batch created. Continue with upload.");
+      await logAuditEvent({
+        organisationId,
+        actorId,
+        action: "batch_created",
+        metadata: {
+          batchId: newBatch.id,
+          clientId,
+          periodLabel: values.periodLabel,
+        },
+      });
       router.push(`/batches/${newBatch.id}`);
     } catch (err) {
       message.error(

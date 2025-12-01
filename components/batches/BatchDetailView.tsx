@@ -43,6 +43,19 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const [exporting, setExporting] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
 
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [refresh]);
+
   const batch = data?.batch ?? null;
 
   const draggerProps = useMemo(
@@ -184,17 +197,6 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       : null;
   const hasActiveJobs = data.jobs.pending + data.jobs.processing > 0;
   const hasFailedJobs = data.jobs.failedJobs.length > 0;
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refresh();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [refresh]);
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>

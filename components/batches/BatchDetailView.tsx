@@ -14,7 +14,7 @@ import {
   Upload,
   message,
 } from "antd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UploadFile, RcFile } from "antd/es/upload/interface";
 import { useOrganisation } from "@/context/OrganisationContext";
 import { useBatchDetail } from "@/hooks/useBatchDetail";
@@ -41,7 +41,6 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
 
   const batch = data?.batch ?? null;
@@ -96,7 +95,6 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       });
       await invokeCreateProcessingJobs(batch.id);
       message.success(`${files.length} file(s) uploaded and queued for processing.`);
-      setProcessingMessage("Processing new files… this may take a minute.");
       setFileList([]);
       await refresh();
     } catch (err) {
@@ -184,6 +182,19 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     typeof batch.processed_files === "number" && typeof batch.total_files === "number"
       ? `${batch.processed_files}/${batch.total_files} files processed`
       : null;
+  const hasActiveJobs = data.jobs.pending + data.jobs.processing > 0;
+  const hasFailedJobs = data.jobs.failedJobs.length > 0;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [refresh]);
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
@@ -217,10 +228,31 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             {processingSummary}
           </Typography.Paragraph>
         )}
-        {processingMessage && (
-          <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
-            {processingMessage}
-          </Typography.Paragraph>
+        {hasFailedJobs && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginTop: 12 }}
+            title={`${data.jobs.failed} file(s) failed during processing`}
+            description={
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {data.jobs.failedJobs.map((job) => (
+                  <li key={job.id}>
+                    {job.storagePath.split("/").pop()} {job.error ? `– ${job.error}` : ""}
+                  </li>
+                ))}
+              </ul>
+            }
+          />
+        )}
+        {!hasFailedJobs && hasActiveJobs && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginTop: 12 }}
+            title="Processing in progress"
+            description={`${data.jobs.pending + data.jobs.processing} file(s) remaining…`}
+          />
         )}
       </Card>
 

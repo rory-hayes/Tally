@@ -29,5 +29,19 @@ describe("buildEmployeeIssueSummaries", () => {
     expect(employees.find((e) => e.employeeId === "emp-2")?.issues.critical).toBe(1);
     expect(totals).toEqual({ critical: 1, warning: 2, info: 0 });
   });
+
+  it("ignores issues without employee or severity", () => {
+    const payslips = [
+      { id: "pay-1", employee_id: "emp-1", employees: { name: "Alice", external_employee_ref: "EMP001" } },
+    ];
+    const issues = [
+      { employee_id: "emp-1", severity: "info" },
+      { employee_id: null, severity: "warning" },
+      { employee_id: "emp-1", severity: null },
+    ];
+
+    const { totals } = buildEmployeeIssueSummaries(payslips as any, issues as any);
+    expect(totals).toEqual({ critical: 0, warning: 0, info: 1 });
+  });
 });
 

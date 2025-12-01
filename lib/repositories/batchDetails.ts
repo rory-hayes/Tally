@@ -23,6 +23,14 @@ export type EmployeeIssueSummary = {
   issues: Record<IssueSeverity, number>;
 };
 
+export type JobSummary = {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  failedJobs: { id: string; storagePath: string; error: string | null }[];
+};
+
 export type BatchDetail = {
   batch: BatchMeta;
   employees: EmployeeIssueSummary[];
@@ -32,6 +40,7 @@ export type BatchDetail = {
     warning: number;
     info: number;
   };
+  jobs: JobSummary;
 };
 
 type PayslipRecord = {
@@ -43,6 +52,13 @@ type PayslipRecord = {
 type IssueRow = {
   employee_id: string | null;
   severity: IssueSeverity | null;
+};
+
+type ProcessingJobRow = {
+  id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  storage_path: string;
+  error: string | null;
 };
 
 const emptyIssueCounts = (): Record<IssueSeverity, number> => ({
@@ -97,6 +113,32 @@ export const buildEmployeeIssueSummaries = (
   return { employees, totals };
 };
 
+const summarizeJobs = (jobs: ProcessingJobRow[] | null | undefined): JobSummary => {
+  const summary: JobSummary = {
+    pending: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    failedJobs: [],
+  };
+
+  (jobs ?? []).forEach((job) => {
+    if (job.status === "pending") summary.pending += 1;
+    if (job.status === "processing") summary.processing += 1;
+    if (job.status === "completed") summary.completed += 1;
+    if (job.status === "failed") {
+      summary.failedJobs.push({
+        id: job.id,
+        storagePath: job.storage_path,
+        error: job.error,
+      });
+    }
+  });
+
+  summary.failed = summary.failedJobs.length;
+  return summary;
+};
+
 export async function fetchBatchDetail(
   organisationId: string,
   batchId: string
@@ -124,7 +166,8 @@ export async function fetchBatchDetail(
     .from("issues")
     .select("employee_id, severity")
     .eq("organisation_id", organisationId)
-    .eq("batch_id", batchId);
+    .eq("batch_id", batchId)
+    .eq("resolved", false);
 
   if (issuesError) {
     throw new Error(`Failed to load issues: ${issuesError.message}`);
@@ -149,10 +192,21 @@ export async function fetchBatchDetail(
     throw new Error(payslipError.message);
   }
 
+  const { data: processingJobs, error: jobsError } = await supabase
+    .from("processing_jobs")
+    .select("id, status, storage_path, error")
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId);
+
+  if (jobsError) {
+    throw new Error(`Failed to load processing jobs: ${jobsError.message}`);
+  }
+
   const { employees, totals } = buildEmployeeIssueSummaries(
     payslips as PayslipRecord[] | null,
     issueRows as IssueRow[] | null
   );
+  const jobs = summarizeJobs(processingJobs as ProcessingJobRow[] | null);
 
   return {
     batch: batchRow as BatchMeta,
@@ -161,6 +215,7 @@ export async function fetchBatchDetail(
       employeesProcessed: employees.length,
       ...totals,
     },
+    jobs,
   };
 }
 

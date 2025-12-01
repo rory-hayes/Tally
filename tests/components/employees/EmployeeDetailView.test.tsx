@@ -41,6 +41,14 @@ const sampleComparison = {
       resolved: false,
       note: null,
     },
+    {
+      id: "issue-2",
+      rule_code: "USC_SPIKE",
+      severity: "warning",
+      description: "USC spiked",
+      resolved: true,
+      note: null,
+    },
   ],
 };
 
@@ -84,6 +92,12 @@ describe("EmployeeDetailView", () => {
     await waitFor(() =>
       expect(toggleIssue).toHaveBeenCalledWith("issue-1", true, "Checked and OK")
     );
+  });
+
+  it("renders resolved issues with secondary styling", () => {
+    render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
+    const resolved = screen.getByText(/usc spiked/i).closest("span");
+    expect(resolved).toHaveClass("ant-typography-secondary");
   });
 });
 

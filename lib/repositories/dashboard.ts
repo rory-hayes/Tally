@@ -62,7 +62,8 @@ export async function fetchDashboardSummaries(
   const { data: issueRows, error: issueError } = await supabase
     .from("issues")
     .select("client_id,severity")
-    .eq("organisation_id", organisationId);
+    .eq("organisation_id", organisationId)
+    .eq("resolved", false);
 
   if (issueError) {
     throw new Error(`Failed to load issue counts: ${issueError.message}`);

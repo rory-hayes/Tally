@@ -79,6 +79,13 @@ const sampleDetail = {
     warning: 3,
     info: 1,
   },
+  jobs: {
+    pending: 0,
+    processing: 0,
+    completed: 2,
+    failed: 0,
+    failedJobs: [],
+  },
 };
 
 describe("BatchDetailView", () => {
@@ -164,10 +171,11 @@ describe("BatchDetailView", () => {
     });
 
     it("shows processing summary text when provided", () => {
-      const detailWithProgress = {
-        ...sampleDetail,
-        batch: { ...sampleDetail.batch, processed_files: 1, total_files: 3 },
-      };
+    const detailWithProgress = {
+      ...sampleDetail,
+      batch: { ...sampleDetail.batch, processed_files: 1, total_files: 3 },
+      jobs: { ...sampleDetail.jobs, processing: 1 },
+    };
       mockUseBatchDetail.mockReturnValue({
         status: "success",
         data: detailWithProgress,
@@ -175,8 +183,56 @@ describe("BatchDetailView", () => {
         refresh: vi.fn(),
       });
 
-      render(<BatchDetailView batchId="batch-1" />);
-      expect(screen.getByText(/1\/3 files processed/i)).toBeInTheDocument();
+    render(<BatchDetailView batchId="batch-1" />);
+    expect(screen.getByText(/1\/3 files processed/i)).toBeInTheDocument();
+    expect(screen.getByText(/processing in progress/i)).toBeInTheDocument();
     });
+
+  it("shows failed job details when jobs fail", () => {
+    mockUseBatchDetail.mockReturnValue({
+      status: "success",
+      data: {
+        ...sampleDetail,
+        jobs: {
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 1,
+          failedJobs: [
+            { id: "job-1", storagePath: "batches/batch-1/EMP003.pdf", error: "OCR error" },
+          ],
+        },
+      },
+      error: null,
+      refresh: vi.fn(),
+    });
+
+    render(<BatchDetailView batchId="batch-1" />);
+    expect(screen.getByText(/failed during processing/i)).toBeInTheDocument();
+    expect(screen.getByText(/EMP003.pdf/i)).toBeInTheDocument();
+  });
+
+  it("refreshes when tab becomes visible", () => {
+    const refresh = vi.fn();
+    mockUseBatchDetail.mockReturnValue({
+      status: "success",
+      data: sampleDetail,
+      error: null,
+      refresh,
+    });
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+
+    render(<BatchDetailView batchId="batch-1" />);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(refresh).toHaveBeenCalled();
+
+    if (originalDescriptor) {
+      Object.defineProperty(document, "visibilityState", originalDescriptor);
+    }
+  });
 });
 

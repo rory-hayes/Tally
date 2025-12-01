@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Tally – Post-MVP Roadmap (Milestones 10–12)</title>
+  <title>Tally Rules Engine Roadmap</title>
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; line-height: 1.5; }
     h1, h2, h3 { margin-top: 1.5rem; }
@@ -16,190 +17,797 @@
   </style>
 </head>
 <body>
-  <h1>Tally – Post-MVP Roadmap</h1>
-  <p>This roadmap defines Milestones 10 through 12, based on QA results from the live MVP and aligned with upcoming production readiness.</p>
+  <h1>Tally – Rules Engine & Reconciliation Roadmap</h1>
+  <p>
+    This roadmap tracks all post-MVP work for Tally's rules engine, country-specific rule packs,
+    additional data sources, and extended user flows. Each task is a small chunk with a Cursor prompt,
+    Definition of Done, and test criteria. Always keep <code>docs/agent.md</code>, <code>docs/architecture.md</code>,
+    and <code>docs/design.md</code> in sync with any changes.
+  </p>
 
-  <h2>Milestone 10 – Hardening, Bugfixes & UI Polish</h2>
-
-  <details>
-    <summary>M10.1 – Fix missing rule triggers (USC spike, Pension %, PRSI/NI category)</summary>
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Ensure all defined rules in runRules() are correctly invoked and result in issue creation.
-
-// Fix rules that are currently not triggering:
-// - USC/NI spike (threshold >20%)
-// - Pension % (EE >=12%, ER >=12%)
-// - PRSI or NI category change
-
-// Before you start:
-// - Use the synthetic payslips (EMP003, EMP005) to validate fix.
-// - Ensure normalisation step extracts usc_ni, pension_employee, pension_employer, prsi_category fields.
-
-// Definition of Done:
-// - EMP003 triggers usc_spike
-// - EMP005 triggers pension_over_threshold
-// - EMP with PRSI change triggers info issue (if supported in test data)
-// - Unit tests confirm each rule fires under expected inputs.
-    </code></pre>
-  </details>
+  <h2>Group 1 – Rules Engine Core & Framework</h2>
 
   <details>
-    <summary>M10.2 – Fix pay date source on Employee Detail view</summary>
+    <summary>
+      <input type="checkbox" /> G1.1 – Rules Engine Config System
+      <span class="done-label">(rule packs & registry)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Design and implement a config-driven rules framework so rules are not hard-coded but defined
+      as data (rule packs) per country and year, with a registry that can be queried by run context.
+    </p>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Display the correct payslip pay date on the employee diff view.
+    <pre><code>/// G1.1 – Rules Engine Config System
+/// Read docs/architecture.md before starting and extend it as needed.
 
-// Issue: Currently shows today's date (new Date()), not the actual period.
-// Fix:
-// - Update the payslip ingestion logic to extract and store the correct pay date (if possible)
-// - Alternatively, fall back to batch.period_label or a derived date from the payslip.
-
-// Definition of Done:
-// - Employee view shows accurate pay dates (e.g. 2025-01 and 2025-02)
-// - Unit test verifies the displayed value matches stored data.
-    </code></pre>
-  </details>
-
-  <details>
-    <summary>M10.3 – Fix batch + dashboard issue counts</summary>
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Ensure issue counts by severity are accurate across batch and dashboard views.
-
-// Symptoms:
-// - EMP003 shows 0 warnings in batch table, but should show 1.
-// - Batch summary card counts may mismatch actual inserted issues.
-
-// Fix:
-// - Re-query issues table correctly with severity filters.
-// - Re-validate aggregation logic for employees.
-
-// Definition of Done:
-// - Dashboard shows accurate issue summary per client
-// - Batch detail summary shows correct critical/warning/info totals
-// - Employee row shows accurate per-employee issue counts
-// - Add tests for issue aggregation functions with synthetic data
-    </code></pre>
-  </details>
-
-  <details>
-    <summary>M10.4 – Improve Upload & Processing Feedback</summary>
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Improve UX around file upload and batch processing visibility.
+// Goal:
+// Introduce a rule registry + config system so that all rules (IE/UK) are declared as data
+// (code, severity, description, country, tax_years) and are loaded dynamically at runtime.
 
 // Requirements:
-// - Fix bug where file picker opens and causes 404
-// - After upload: show confirmation (toast), disable re-click
-// - While processing: show a spinner or message in Batch UI
-// - If a job fails: display that X/Y files processed and which failed
+// - Define a RuleDefinition type with: code, descriptionTemplate, severity, categories, appliesTo (country/tax_years), fn.
+// - Create a registry module (e.g., src/rules/registry.ts) that exports functions:
+//   - getActiveRules(country, taxYear): RuleDefinition[]
+// - Move existing MVP rules into this registry as data-driven entries.
+// - Ensure runRules(...) uses getActiveRules(...) instead of a hard-coded internal list.
 
 // Definition of Done:
-// - Upload UI never navigates away (404 bug fixed)
-// - Toast confirms upload + job creation
-// - Batch page displays progress and handles partial failure
-// - UI tests simulate each of these paths with mocked state
-    </code></pre>
+// - Rules are no longer hard-coded inside runRules; they are loaded from a registry.
+// - It is possible to add a new rule by adding a RuleDefinition, without changing core engine code.
+// - docs/architecture.md updated with the registry design.
+
+// Tests:
+// - Unit tests for getActiveRules(country, taxYear) with sample packs (e.g., IE 2025, UK 2025).
+// - Test that runRules picks up newly registered rules without code changes.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>RuleDefinition type and registry module created.</li>
+      <li>Existing MVP rules moved into registry.</li>
+      <li><code>runRules</code> uses registry for active rules.</li>
+      <li><code>docs/architecture.md</code> updated.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Tests verifying registry filtering by country + year.</li>
+      <li>Tests verifying <code>runRules</code> executes rules from registry.</li>
+    </ul>
   </details>
 
   <details>
-    <summary>M10.5 – Fix issue resolution & table refresh logic</summary>
+    <summary>
+      <input type="checkbox" /> G1.2 – Country & Year Awareness
+      <span class="done-label">(context for tax configs)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Extend the rule context to include country and tax_year so that rule packs and configurations
+      can be selected correctly for IE and UK for each tax year.
+    </p>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Ensure marking issues as resolved updates both UI and database correctly.
+    <pre><code>/// G1.2 – Country & Year Awareness
 
-// Fix:
-// - After resolving/unresolving, batch employee table should refresh
-// - Employee issue count should reflect resolved/unresolved status
+// Goal:
+// Ensure that every rules engine invocation knows which country and tax year it applies to
+// and that this information is used to load the right rule pack and rate config.
+
+// Requirements:
+// - Extend RuleContext to include: country ('IE' | 'UK') and taxYear (number).
+// - Ensure all call sites (pipeline, tests) pass these values based on client settings and pay date.
+// - Adjust registry/getActiveRules to filter using country + taxYear.
+// - Wire country/taxYear into config-loading where needed.
 
 // Definition of Done:
-// - Marking an issue as resolved reflects immediately in batch summary
-// - Resolved issue still visible (greyed, struck through)
-// - Unresolved issues update counts appropriately
-// - Add tests for resolution toggle effect on state
-    </code></pre>
-  </details>
+// - RuleContext includes country and taxYear.
+// - All existing rules still work and tests updated to pass new context fields.
 
-  <h2>Milestone 11 – Pre-Launch Enhancements</h2>
-
-  <details>
-    <summary>M11.1 – Implement audit log tracking for key actions</summary>
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Begin writing to audit_logs table for traceability.
-
-// Events to log:
-// - Batch created
-// - Payslips uploaded
-// - Issues marked resolved/unresolved
-
-// Definition of Done:
-// - Each action creates audit_log row with actor, action_type, metadata, and timestamp
-// - Metadata includes batch ID, employee ID, or issue ID as applicable
-// - DB test confirms row inserted for each case
-    </code></pre>
-  </details>
-
-  <details>
-    <summary>M11.2 – Store and display resolved_by user + timestamp</summary>
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Populate resolved_by and resolved_at in issues when marked resolved.
-
-// Update:
-// - Extend resolution mutation to capture user ID and timestamp
-// - Display on issue tooltip: "Resolved by [user] on [date/time]"
-
-// Definition of Done:
-// - Resolved issues show tooltip with user + date
-// - DB row contains resolved_by, resolved_at
-// - Manual test confirms resolution attribution is recorded
-    </code></pre>
+// Tests:
+// - Unit tests for getActiveRules using different country/taxYear combinations.
+// - Pipeline tests that verify the correct pack is selected for IE vs UK.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li><code>RuleContext</code> extended with <code>country</code> and <code>taxYear</code>.</li>
+      <li>All call sites updated to pass country/year.</li>
+      <li>Registry filtered by country/year.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Tests verifying correct pack selection for IE vs UK.</li>
+      <li>Existing rules tests updated to include country/year context.</li>
+    </ul>
   </details>
 
   <details>
-    <summary>M11.3 – Surface failed payslip jobs in UI</summary>
+    <summary>
+      <input type="checkbox" /> G1.3 – Rule Threshold & Tuning Config
+      <span class="done-label">(large-change, tolerances)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Make rule thresholds (e.g. "large net change" at 20%) configurable per country and allow
+      overrides per client to reduce noise and tune sensitivity.
+    </p>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Make failed jobs visible in the batch view for troubleshooting.
+    <pre><code>/// G1.3 – Rule Threshold & Tuning Config
 
-// When a job fails:
-// - It should not silently be skipped
-// - UI should show a badge or warning e.g. "9 of 10 processed – 1 failed"
+// Goal:
+// Move hard-coded thresholds (e.g., large gross/net change percentages, tolerance for rounding)
+// into country-level and client-level configuration objects.
+
+// Requirements:
+// - Introduce a RuleConfig type (e.g., { largeNetChangePercent: number; roundingTolerance: number; ... }).
+// - Load default config per country/year from JSON or TS config files.
+// - Add optional client-level overrides stored in DB (e.g., client_rule_config table).
+// - Update rules that currently use hard-coded thresholds to use config values from RuleContext.config.
 
 // Definition of Done:
-// - Failed jobs appear in the batch file summary
-// - Employee count reflects only successful payslips
-// - User can see which file(s) failed
-    </code></pre>
+// - No rule uses magic numbers for thresholds; all come from config.
+// - Client can override at least one threshold (e.g., largeNetChangePercent).
+
+// Tests:
+// - Unit tests verifying that a rule changes behaviour based on different config values.
+// - Tests for merging default config with client overrides.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>RuleConfig introduced and loaded per country/year.</li>
+      <li>Client override mechanism implemented for at least one threshold.</li>
+      <li>No hard-coded rule thresholds remain in rule functions.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Tests for config merging and threshold behaviour.</li>
+    </ul>
   </details>
 
   <details>
-    <summary>M11.4 – YTD and PRSI field extraction</summary>
+    <summary>
+      <input type="checkbox" /> G1.4 – Issue Data Enrichment
+      <span class="done-label">(expected vs actual values)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Extend IssueCandidate to carry structured fields (expected vs actual, band, rate, etc.)
+      so UI and reports can show detailed evidence for each flag.
+    </p>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Extend Textract normalization to extract:
-// - YTD gross/net/PAYE/USC
-// - PRSI or NI category
+    <pre><code>/// G1.4 – Issue Data Enrichment
 
-// Update:
-// - Add regex patterns to match YTD values from OCR text
-// - Store in payslip fields ytd_* and prsi_or_ni_category
+// Goal:
+// Make issues more informative by attaching structured payloads
+// (expected values, actual values, difference, and other key metadata).
+
+// Requirements:
+// - Extend IssueCandidate to include a data field: e.g. data?: { [key: string]: unknown }.
+// - For relevant rules (e.g., tax recalculation), include fields like:
+//   - expectedTax, actualTax, difference, rateUsed, bandInfo, etc.
+// - Update rule implementations to populate data where applicable.
+// - Ensure DB schema for issues can store this structured data (e.g., JSONB column).
 
 // Definition of Done:
-// - EMP payslips parse and store YTD values where present
-// - PRSI category field populated from OCR
-// - Unit test confirms correct values extracted from representative OCR lines
-    </code></pre>
+// - Issues for at least one recalculation rule include detailed data payloads.
+// - Issue DB model and API can persist and return this data.
+// - UI can read the data (even if minimal initial display).
+
+// Tests:
+// - Unit tests confirming that rule functions populate IssueCandidate.data correctly.
+// - DB tests (or integration tests) verifying data is stored and retrieved intact.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>IssueCandidate extended with structured data payload.</li>
+      <li>Issues persisted with data field.</li>
+      <li>At least one rule populates and uses this data.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Data payload tests for selected rules.</li>
+      <li>Integration tests verifying DB persistence of issue data.</li>
+    </ul>
   </details>
 
   <details>
-    <summary>M11.5 – Add employee count to client list and batch</summary>
+    <summary>
+      <input type="checkbox" /> G1.5 – Golden Test Dataset & Severity Model
+      <span class="done-label">(golden cases & severity)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Create a golden set of payslip scenarios and finalise a consistent severity model, ensuring each rule
+      has clear tests for triggering and not triggering, with severity aligned to impact.
+    </p>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Show number of employees processed per batch and per client.
+    <pre><code>/// G1.5 – Golden Test Dataset & Severity Model
 
-// Client page:
-// - Add "Employees processed" column
-// Batch table:
-// - Show employee count once payslips are processed
+// Goal:
+// Build a curated set of test cases (golden dataset) and lock in a severity model
+// that is applied consistently across rules.
+
+// Requirements:
+// - Define severity model (info/warning/critical) and document criteria in docs/architecture.md.
+// - For each existing rule, assign a default severity.
+// - Create fixtures representing "correct payroll" and "known error patterns" for IE & UK.
+// - Add tests that run runRules across these fixtures and assert the exact set of issues and severities.
 
 // Definition of Done:
-// - Employee count appears for each batch row
-// - Client list aggregates unique employees across all batches
-// - Test for aggregation logic with mocked data
-    </code></pre>
+// - Golden test cases exist and are used in the test suite.
+// - All current rules have explicit severity values documented.
+// - Changes to rules that break golden expectations will cause tests to fail.
+
+// Tests:
+// - Golden dataset tests covering: no issues for correct scenarios, specific issues for error scenarios.
+// - Snapshot-style tests or detailed assertions for rule outputs.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>Golden dataset created and integrated into tests.</li>
+      <li>Severity model documented and applied to all current rules.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Golden tests for "correct" vs "error" scenarios.</li>
+    </ul>
+  </details>
+
+  <h2>Group 2 – Ireland Rule Pack (IE PAYE/USC/PRSI)</h2>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G2.1 – IE Rate Config (PAYE, USC, PRSI)
+      <span class="done-label">(config per tax year)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Implement structured configuration for IE PAYE bands, USC bands, and PRSI classes per tax year,
+      based on official Revenue guidance, and loaded via the rules engine config system.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G2.1 – IE Rate Config (PAYE, USC, PRSI)
+
+// Goal:
+// Create configuration files and loaders for IE PAYE/USC/PRSI rates and thresholds per tax year.
+// Use official Revenue documentation as the source of truth.
+
+// Requirements:
+// - Design IE-specific config types: IeTaxYearConfig { payeBands, uscBands, prsiClasses, thresholds, etc. }.
+// - Add JSON or TS config files: config/ie/2025.ts (and skeleton for other years).
+// - Add a loader: getIeConfigForYear(taxYear) that returns typed config.
+// - Document source references in comments (link to Revenue docs).
+
+// Definition of Done:
+// - IE 2025 config implemented with correct rates and bands.
+// - Loader available in RuleContext.config for IE runs.
+// - docs/architecture.md references config location and structure.
+
+// Tests:
+// - Unit tests verifying config structure and that key values match expected numbers for 2025.
+// - Basic sanity checks (bands sorted by threshold, rates non-negative, etc.).
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>IE 2025 PAYE/USC/PRSI config created and loaded.</li>
+      <li><code>getIeConfigForYear</code> returns typed config.</li>
+      <li>Revenue references documented in comments/docs.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Config sanity tests for IE 2025.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G2.2 – IE PAYE Recalculation Rules
+      <span class="done-label">(exact PAYE correctness)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Implement IE PAYE recalculation rules using IE config and RPN-like context, and compare expected PAYE
+      to payslip PAYE with tight tolerances, flagging any discrepancies.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G2.2 – IE PAYE Recalculation Rules
+
+// Goal:
+// Recalculate IE PAYE (Income Tax) for each payslip using configured rates/bands and RPN info
+// and flag discrepancies vs payslip PAYE.
+
+// Requirements:
+// - Extend RuleContext with IE-specific fields: credits, cutOff, standardRate, higherRate, etc. (from RPN or client setup).
+// - Implement IE PAYE calculation function: calcIePaye(currentPayslip, ieConfig, rpnData).
+// - Implement a rule: IE_PAYE_MISMATCH that compares expected vs actual PAYE and emits an issue when difference > tolerance.
+// - Use IssueCandidate.data to include expectedTax, actualTax, difference, band breakdown.
+
+// Definition of Done:
+// - For synthetic IE test cases, calculated PAYE matches expected values based on config and RPN data.
+// - IE_PAYE_MISMATCH triggers only when there is a real discrepancy (beyond rounding).
+
+// Tests:
+// - Unit tests for calcIePaye using known sample scenarios (from Revenue examples where possible).
+// - Rule tests verifying IE_PAYE_MISMATCH triggers correctly.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>IE PAYE calculation utilities implemented.</li>
+      <li>IE_PAYE_MISMATCH rule added and working.</li>
+      <li>Test cases validate correctness for typical IE cases.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Unit tests for <code>calcIePaye</code>.</li>
+      <li>Rule tests for PAYE mismatches.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G2.3 – IE USC Recalculation Rules
+      <span class="done-label">(exact USC correctness)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Implement IE USC recalculation rules using USC bands and rates, comparing recalculated USC
+      to payslip USC and flagging discrepancies.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G2.3 – IE USC Recalculation Rules
+
+// Goal:
+// Recalculate IE USC (Universal Social Charge) from USC-able income and band thresholds
+// and flag any differences with the USC on the payslip.
+
+// Requirements:
+// - Implement calcIeUsc(currentPayslip, ieConfig) using USC bands and USC income base.
+// - Implement rule IE_USC_MISMATCH to compare expected vs actual USC.
+// - Add IssueCandidate.data fields for expectedUsc, actualUsc, difference, band usage.
+
+// Definition of Done:
+// - For synthetic USC scenarios, calcIeUsc matches known correct results.
+// - IE_USC_MISMATCH triggers only for real differences beyond rounding tolerance.
+
+// Tests:
+// - Unit tests for calcIeUsc with carefully constructed inputs.
+// - Rule tests for IE_USC_MISMATCH.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>USC calculation implemented.</li>
+      <li>USC mismatch rule added.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Tests for USC calculation logic.</li>
+      <li>Tests for mismatch detection.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G2.4 – IE PRSI Class & Rate Rules
+      <span class="done-label">(PRSI correctness)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Validate IE PRSI class and EE/ER contributions using configured thresholds and rules, flagging mismatches
+      where PRSI is applied incorrectly or missing.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G2.4 – IE PRSI Class & Rate Rules
+
+// Goal:
+// Verify that PRSI class and contributions match IE rules for the employee profile and earnings.
+//
+// Requirements:
+// - Extend RuleContext with relevant IE PRSI config (earnings thresholds, rate tables per class).
+// - Implement calcIePrsi(currentPayslip, ieConfig, employeeProfile).
+// - Implement rules: IE_PRSI_MISMATCH and IE_PRSI_CLASS_UNUSUAL.
+// - IE_PRSI_MISMATCH: EE/ER PRSI amounts differ from calculated values by more than tolerance.
+// - IE_PRSI_CLASS_UNUSUAL: PRSI class inconsistent with typical profile (e.g., pensioner, low pay).
+
+// Definition of Done:
+// - EE/ER PRSI recalculation works for synthetic cases.
+// - Rules trigger only for genuine deviations.
+
+// Tests:
+// - Unit tests for calcIePrsi with multiple PRSI classes.
+// - Rule tests for mismatch and unusual class cases.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>PRSI calculation and rules implemented.</li>
+      <li>Edge cases captured by tests.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>PRSI calculation unit tests.</li>
+      <li>Rule tests for mismatch & unusual class.</li>
+    </ul>
+  </details>
+
+  <h2>Group 3 – UK Rule Pack (UK PAYE/NIC/Loans)</h2>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G3.1 – UK Rate Config (PAYE, NIC, Student Loans)
+      <span class="done-label">(config per tax year)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Build structured configuration for UK PAYE bands, personal allowances, NIC thresholds and rates,
+      and student loan thresholds per tax year.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G3.1 – UK Rate Config (PAYE, NIC, Student Loans)
+
+// Goal:
+// Create a config layer for UK PAYE, NIC, and student loan thresholds per tax year
+// using HMRC official rate tables as the source of truth.
+
+// Requirements:
+// - Define UkTaxYearConfig type: payeBands, personalAllowance, nicThresholds, nicRates, loanThresholds, etc.
+// - Implement config/uk/2025.ts (and skeleton for other years).
+// - Create a loader: getUkConfigForYear(taxYear).
+// - Document HMRC references in comments/docs.
+
+// Definition of Done:
+// - UK 2025 config implemented and loadable.
+// - Available via RuleContext for UK rules.
+// - docs/architecture.md updated with UK config structure.
+
+// Tests:
+// - Unit tests verifying key values match HMRC 2025 rates (bands, thresholds).
+// - Sanity tests for threshold order and non-negative rates.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>UK 2025 PAYE/NIC/Loan config created.</li>
+      <li><code>getUkConfigForYear</code> implemented.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Config sanity tests for UK 2025.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G3.2 – UK PAYE Tax Code Rules
+      <span class="done-label">(PAYE correctness by code)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Implement UK PAYE recalculation rules that use tax codes and UK config to recalc expected tax and
+      flag discrepancies versus payslip PAYE.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G3.2 – UK PAYE Tax Code Rules
+
+// Goal:
+// Recalculate PAYE for UK payslips using tax codes and config, then flag mismatches.
+//
+// Requirements:
+// - Extend RuleContext with: taxCode, payFrequency, appropriate UK context.
+// - Implement calcUkPaye(currentPayslip, ukConfig, taxCode, payFrequency).
+// - Implement rule: UK_PAYE_MISMATCH to compare expected vs actual tax.
+// - Attach detailed data to IssueCandidate (expectedTax, actualTax, difference, codeUsed).
+
+// Definition of Done:
+// - For test cases with simple tax codes (e.g., 1257L, BR), calcUkPaye matches expected amounts.
+// - UK_PAYE_MISMATCH triggers only when scientific discrepancy exists (beyond tolerance).
+
+// Tests:
+// - Unit tests for calcUkPaye with sample inputs and expected HMRC results.
+// - Rule tests for UK_PAYE_MISMATCH.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>UK PAYE calc utilities implemented.</li>
+      <li>UK_PAYE_MISMATCH rule added.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Unit tests for <code>calcUkPaye</code>.</li>
+      <li>Rule tests for mismatch scenarios.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G3.3 – UK NIC Category & Rate Rules
+      <span class="done-label">(NIC correctness)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Implement NIC recalculation rules using NIC category letters and thresholds, flagging incorrect
+      EE/ER NIC amounts or inappropriate NIC categories.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G3.3 – UK NIC Category & Rate Rules
+
+// Goal:
+// Verify employee and employer NIC based on category letter and thresholds, and detect misapplication.
+//
+// Requirements:
+// - Implement calcUkNic(currentPayslip, ukConfig, categoryLetter).
+// - Implement rules: UK_NIC_MISMATCH and UK_NIC_CATEGORY_UNUSUAL.
+// - UK_NIC_MISMATCH: NIC differs from expected beyond tolerance.
+// - UK_NIC_CATEGORY_UNUSUAL: category letter inconsistent with profile (age, employment type).
+
+// Definition of Done:
+// - NIC calculations correct for synthetic test cases across categories A, C, H, M, etc.
+// - Rules fire only for true anomalies.
+
+// Tests:
+// - Unit tests for calcUkNic with different categories and earnings levels.
+// - Rule tests for NIC mismatch and category anomalies.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>UK NIC calculation implemented.</li>
+      <li>NIC rules added and tested.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>NIC calc unit tests.</li>
+      <li>Rule tests for mismatch & unusual category.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G3.4 – UK Student Loan & PG Loan Rules
+      <span class="done-label">(loan deduction correctness)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Implement student loan and postgraduate loan checks using plan types and thresholds, verifying that
+      loan deductions align with HMRC rules.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G3.4 – UK Student Loan & PG Loan Rules
+
+// Goal:
+// Check that student loan and postgraduate loan deductions are correct given earnings and plan type.
+//
+// Requirements:
+// - Extend RuleContext with student loan plan info (Plan 1/2/4/5, PG loan flags).
+// - Implement calcUkStudentLoan(currentPayslip, ukConfig, planType).
+// - Implement rule UK_STUDENT_LOAN_MISMATCH for under/over deductions.
+// - IssueCandidate.data should capture thresholds and calculated vs actual deduction.
+
+// Definition of Done:
+// - For synthetic cases, calculations match expected HMRC logic for given plan type.
+// - Mismatches are detected and flagged appropriately.
+
+// Tests:
+// - Unit tests for calcUkStudentLoan across multiple plan types and earnings levels.
+// - Rule tests for mismatch scenarios.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>Student loan calc implemented.</li>
+      <li>Loan mismatch rule working.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Unit tests for loan calculation.</li>
+      <li>Rule tests for mismatches.</li>
+    </ul>
+  </details>
+
+  <h2>Group 4 – Additional Inputs & Data Sources</h2>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G4.1 – Contract & HR Data Integration
+      <span class="done-label">(contracts, salary/hourly, hours)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Ingest per-employee contract data (salary, hourly rate, standard hours, overtime rules) to enable
+      contract compliance rules (salary consistency, minimum wage checks etc.).
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G4.1 – Contract & HR Data Integration
+
+// Goal:
+// Add a data model and ingestion path for contract/HR data per employee to enrich RuleContext.
+//
+// Requirements:
+// - Define Contract/EmployeeProfile entities (tables) storing salary, hourly rate, standard hours, etc.
+// - Extend RuleContext with optional contract/profile data.
+// - Implement basic CRUD for contract data in backend and minimal UI to upload or edit.
+// - Ensure no existing rules break when contract data is absent (optional field).
+
+// Definition of Done:
+// - Contract data can be stored and retrieved for employees.
+// - RuleContext can include contract/profile information.
+// - docs/architecture.md updated with new entities and relationships.
+
+// Tests:
+// - Unit tests for contract/profile repository functions.
+// - Integration tests to ensure rules can safely handle presence/absence of contract data.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>Contract/EmployeeProfile model created and wired into context.</li>
+      <li>Contract data does not break existing rules when missing.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Repo tests for contract/profile entities.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G4.2 – Payroll Register (Gross-to-Net) Ingestion
+      <span class="done-label">(reconcile payslips vs register)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Ingest gross-to-net reports from payroll systems and reconcile them with payslips to detect
+      missing or mismatched items at batch level.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G4.2 – Payroll Register (Gross-to-Net) Ingestion
+
+// Goal:
+// Enable ingestion of payroll gross-to-net reports for each batch and reconcile against payslips.
+//
+// Requirements:
+// - Define a PayrollRegister table with per-employee and per-batch totals (gross, tax, USC/NIC, net, etc.).
+// - Add an ingestion endpoint/Edge Function for CSV upload of register data (per client/batch).
+// - Implement reconciliation rules: REGISTER_PAYSPLIP_TOTAL_MISMATCH, MISSING_REGISTER_ENTRY, MISSING_PAYSLIP.
+// - Extend RuleContext at batch level with summary reconciliation results.
+//
+// Definition of Done:
+// - Gross-to-net data can be imported for a batch and mapped to employees.
+// - At least basic total reconciliation rules implemented and generating issues when mismatches occur.
+
+// Tests:
+// - Unit tests for CSV parsing/mapping of register data.
+// - Rule tests for basic reconciliation issues.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>PayrollRegister model and ingestion path implemented.</li>
+      <li>Basic reconciliation rules for gross-to-net vs payslips working.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Parsing/mapping tests for payroll register CSV.</li>
+      <li>Rule tests for reconciliation mismatches.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G4.3 – GL Payroll Postings Ingestion
+      <span class="done-label">(reconcile against accounting)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Ingest general ledger payroll postings and reconcile them with payroll register and payslips
+      to detect discrepancies between payroll and accounting systems.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G4.3 – GL Payroll Postings Ingestion
+
+// Goal:
+// Import GL postings related to payroll (wages, ER taxes, pensions) and reconcile totals against payroll data.
+//
+// Requirements:
+// - Define a GlPosting or PayrollGlSummary table keyed by batch/client with amounts for wages, ER taxes, pensions, etc.
+// - Implement CSV or API ingestion for GL data (e.g., Xero/Sage exports).
+// - Implement reconciliation rules: GL_PAYROLL_TOTAL_MISMATCH, GL_EMPLOYER_TAX_MISMATCH, etc.
+// - Extend batch-level context with GL summary for rules to use.
+
+// Definition of Done:
+// - GL data can be imported and associated with batches.
+// - Basic reconciliation rules implemented and flagged when totals deviate beyond tolerance.
+
+// Tests:
+// - Unit tests for GL CSV parsing/mapping.
+// - Rule tests for GL vs payroll mismatches.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>GL ingestion path implemented.</li>
+      <li>GL reconciliation rules added and tested.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Parsing tests for GL imports.</li>
+      <li>Rules tests for GL mismatches.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G4.4 – Bank Payment File Ingestion
+      <span class="done-label">(reconcile net pay vs bank)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Ingest bank payment files (SEPA/BACS) and reconcile net pay amounts per employee against
+      payslips for payment validation.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G4.4 – Bank Payment File Ingestion
+
+// Goal:
+// Import bank payment files for payroll and match payments to payslips to validate net pay disbursements.
+//
+// Requirements:
+// - Define a PaymentFile and PaymentRecord model keyed by batch/client/employee.
+// - Implement CSV or file ingestion for SEPA/BACS formats (start with a simple CSV mapping).
+// - Implement reconciliation rules: BANK_NETPAY_MISMATCH, BANK_PAYMENT_WITHOUT_PAYSLIP, PAYSLIP_WITHOUT_PAYMENT.
+// - Integrate results into batch-level reconciliation summary.
+
+// Definition of Done:
+// - Payment data can be ingested and mapped to employees/batches.
+// - Reconciliation rules implemented and create issues for mismatches.
+
+// Tests:
+// - Unit tests for payment file parsing and employee matching logic.
+// - Rule tests for net-pay reconciliation scenarios.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>Bank file ingestion implemented.</li>
+      <li>Reconciliation rules for net pay vs bank payments working.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Parsing/matching tests for bank files.</li>
+      <li>Rule tests for payment mismatches.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>
+      <input type="checkbox" /> G4.5 – Revenue.ie & HMRC Submissions Reconciliation
+      <span class="done-label">(ROS/RTI checks)</span>
+    </summary>
+    <h4>Description</h4>
+    <p>
+      Ingest summary data from Revenue (ROS) and HMRC (RTI FPS/EPS) and reconcile it against
+      payroll batches to ensure statutory submissions match internal records.
+    </p>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>/// G4.5 – Revenue.ie & HMRC Submissions Reconciliation
+
+// Goal:
+// Reconcile payroll batches with official tax submissions (ROS/RTI) to detect mismatches in statutory totals.
+//
+// Requirements:
+// - Define models for RosSubmissionSummary and RtiSubmissionSummary keyed by batch/client.
+// - Implement manual CSV upload or placeholder API ingestion for summary totals (PAYE, USC/NIC, employee count).
+// - Implement rules: SUBMISSION_TOTAL_MISMATCH, SUBMISSION_EMPLOYEE_COUNT_MISMATCH.
+// - Surface these in batch-level summaries as high-severity issues.
+
+// Definition of Done:
+// - Submission summary data can be associated with a batch.
+// - Submission reconciliation rules implemented and tested.
+// - High severity issues raised when submission data conflicts with payroll data.
+
+// Tests:
+// - Unit tests for mapping submission summaries to batches.
+// - Rule tests for submission vs payroll mismatches.
+</code></pre>
+    <h4>Definition of Done</h4>
+    <ul>
+      <li>Submission summary models and ingestion path added.</li>
+      <li>Reconciliation rules for ROS/RTI summaries working.</li>
+    </ul>
+    <h4>Tests</h4>
+    <ul>
+      <li>Tests for submission mapping.</li>
+      <li>Rule tests for submission mismatch scenarios.</li>
+    </ul>
   </details>
 
 </body>

@@ -7,7 +7,7 @@ import {
 } from "../../../lib/logic/rulesEngine.ts";
 
 export const PAYSLIP_SELECT_FIELDS =
-  "id, organisation_id, client_id, batch_id, employee_id, pay_date, gross_pay, net_pay, paye, usc_or_ni, pension_employee, pension_employer, ytd_gross, ytd_net, ytd_tax, ytd_usc_or_ni, prsi_or_ni_category";
+  "id, organisation_id, client_id, batch_id, employee_id, pay_date, gross_pay, net_pay, paye, usc_or_ni, pension_employee, pension_employer, ytd_gross, ytd_net, ytd_tax, ytd_usc_or_ni, prsi_or_ni_category, clients:clients (country)";
 
 export type PayslipForRules = PayslipLike & {
   id: string;
@@ -15,6 +15,8 @@ export type PayslipForRules = PayslipLike & {
   client_id: string;
   batch_id: string;
   employee_id: string;
+  pay_date?: string | null;
+  clients?: { country: string | null } | null;
 };
 
 export type IssueInsertRow = {
@@ -36,7 +38,15 @@ export const buildIssuesForPayslip = (
   previous: PayslipForRules | null
 ): IssueInsertRow[] => {
   const diff = calculateDiff(previous, current);
-  const issues = runRules(current, previous, diff);
+  const payYear = current.pay_date ? new Date(current.pay_date).getUTCFullYear() : undefined;
+  const country =
+    (current.clients && !Array.isArray(current.clients) ? current.clients?.country : null) ??
+    undefined;
+
+  const issues = runRules(current, previous, diff, {
+    country: country ?? undefined,
+    taxYear: payYear,
+  });
 
   return issues.map((issue) => ({
     organisation_id: current.organisation_id,

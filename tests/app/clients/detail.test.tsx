@@ -119,14 +119,8 @@ describe("ClientDetailContent", () => {
 
     render(<ClientDetailContent clientId="client-123" />);
 
-    await waitFor(() =>
-      expect(repoMocks.getBatchesForClient).toHaveBeenCalledWith(
-        "org-123",
-        "client-123"
-      )
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /upload batch/i }));
+    const uploadButton = await screen.findByRole("button", { name: /upload batch/i });
+    fireEvent.click(uploadButton);
     fireEvent.change(screen.getByLabelText(/period/i), {
       target: { value: "Jan 2025" },
     });

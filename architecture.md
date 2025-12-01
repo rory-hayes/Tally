@@ -163,6 +163,19 @@ Endpoints / functions (MVP):
 - `get_batch_summary(batch_id)`: aggregated counts and basic metrics (or built from client-side queries).
 - `generate_batch_report(batch_id)`: returns data to render/download as CSV/PDF.
 
+## 6. Rules Engine + Registry
+
+The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, etc.) are evaluated inside the processing pipeline after each payslip insert. To make the ruleset maintainable across different jurisdictions (IE/UK) and tax years, the engine now loads rules from a registry module instead of hard-coding logic.
+
+- `lib/rules/registry.ts` exports:
+  - `RuleDefinition` objects describing rule metadata (`code`, `severity`, `categories`, `descriptionTemplate`, applicability by `country`/`tax_year`).
+  - `getActiveRules(country, taxYear)` which filters the registry for the current payslip context.
+- Each rule definition provides an `evaluate(context)` function (pure) that inspects the current/previous payslip diff and returns zero or more `IssueCandidate`s.
+- `runRules(current, previous, diff, options)` simply fetches the active rule pack and executes each definition. Adding a new rule requires only appending a `RuleDefinition` entry; engine code stays unchanged.
+- Countries / tax years default to `IE` / derived from payslip `pay_date`, but clients can extend coverage by adding new definitions or packs.
+
+This layout keeps the business logic declarative and testable (registry tests ensure filtering works by country/year, and `runRules` integration tests verify that newly registered rules are automatically executed).
+
 ## 6. Migration Path to AWS
 
 When scale or complexity demands:

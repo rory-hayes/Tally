@@ -8,12 +8,14 @@ import type {
   RuleCode,
   RuleEvaluationOutcome,
   RuleConfig,
+  IeRuleContext,
 } from "@/lib/rules/types";
 
 export type RuleRuntimeOptions = {
   country?: CountryCode;
   taxYear?: number;
   config?: RuleConfig;
+  ieContext?: IeRuleContext | null;
 };
 
 export type { IssueCandidate, IssueSeverity, RuleCode } from "@/lib/rules/types";
@@ -37,6 +39,7 @@ export const runRules = (
     typeof options.taxYear === "number" ? options.taxYear : null;
   const derivedConfig =
     options.config ?? getDefaultRuleConfig(derivedCountry, derivedTaxYear);
+  const ieContext = options.ieContext ?? null;
 
   const activeRules = getActiveRules(derivedCountry, derivedTaxYear);
 
@@ -49,6 +52,7 @@ export const runRules = (
         country: derivedCountry,
         taxYear: derivedTaxYear,
         config: derivedConfig,
+        ieContext,
       })
     );
 

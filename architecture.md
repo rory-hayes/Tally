@@ -191,6 +191,7 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
     | `PRSI_CATEGORY_CHANGE` | info | Compliance metadata change needing awareness |
     | `PENSION_EMPLOYEE_HIGH` | warning | Employee pension exceeding configured % |
     | `PENSION_EMPLOYER_HIGH` | info | Employer pension above threshold |
+    | `IE_PAYE_MISMATCH` | warning | Recomputed PAYE differs from payslip beyond tolerance |
 
 - **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.
 

@@ -11,7 +11,8 @@ export type RuleCode =
   | "YTD_REGRESSION"
   | "PRSI_CATEGORY_CHANGE"
   | "PENSION_EMPLOYEE_HIGH"
-  | "PENSION_EMPLOYER_HIGH";
+  | "PENSION_EMPLOYER_HIGH"
+  | "IE_PAYE_MISMATCH";
 
 export type IssueDataPayload = Record<string, unknown>;
 
@@ -31,6 +32,7 @@ export type RuleEvaluationContext = {
   country: CountryCode;
   taxYear: number | null;
   config: RuleConfig;
+  ieContext?: IeRuleContext | null;
 };
 
 export type RuleEvaluationOutcome = {
@@ -55,5 +57,12 @@ export type RuleConfig = {
   pensionEmployeePercent: number;
   pensionEmployerPercent: number;
   ieConfig?: IeTaxYearConfig | null;
+};
+
+export type IeRuleContext = {
+  paye?: {
+    standardRateCutoff: number;
+    taxCredits: number;
+  };
 };
 

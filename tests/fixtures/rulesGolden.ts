@@ -1,5 +1,6 @@
 import type { CountryCode, IssueSeverity, RuleCode } from "@/lib/rules/types";
 import type { PayslipLike } from "@/lib/logic/payslipDiff";
+import type { RuleRuntimeOptions } from "@/lib/logic/rulesEngine";
 
 export type GoldenScenario = {
   name: string;
@@ -7,6 +8,7 @@ export type GoldenScenario = {
   previous: PayslipLike | null;
   current: PayslipLike;
   expectedIssues: { ruleCode: RuleCode; severity: IssueSeverity }[];
+  runtimeOptions?: Partial<RuleRuntimeOptions>;
 };
 
 const basePayslip: PayslipLike = {
@@ -77,6 +79,22 @@ export const goldenScenarios: GoldenScenario[] = [
     previous: clone(),
     current: clone({ usc_or_ni: 220, gross_pay: 3050 }),
     expectedIssues: [{ ruleCode: "USC_SPIKE_WITHOUT_GROSS", severity: "warning" }],
+  },
+  {
+    name: "IE PAYE mismatch warning",
+    country: "IE",
+    previous: clone({ gross_pay: 4000, paye: 400 }),
+    current: clone({ gross_pay: 4000, paye: 400 }),
+    expectedIssues: [{ ruleCode: "IE_PAYE_MISMATCH", severity: "warning" }],
+    runtimeOptions: {
+      ieContext: {
+        paye: {
+          standardRateCutoff: 3500,
+          taxCredits: 300,
+        },
+      },
+      taxYear: 2025,
+    },
   },
 ];
 

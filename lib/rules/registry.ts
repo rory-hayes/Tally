@@ -1,4 +1,5 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
+import { calcIePaye } from "@/lib/rules/iePaye";
 import type {
   CountryCode,
   IssueSeverity,
@@ -21,6 +22,7 @@ export type RuleDefinition = {
 };
 
 const COUNTRY_ALL: CountryCode[] = ["IE", "UK"];
+const IE_PAYE_MISMATCH_TOLERANCE = 1; // €1 tolerance for rounding
 
 const formatAmount = (value: number | null | undefined) =>
   typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
@@ -245,6 +247,45 @@ const baseRuleDefinitions: RuleDefinition[] = [
       }
       return applyIssue(
         describePensionPercent("Employer pension contribution", percent, pension, grossCurrent)
+      );
+    },
+  },
+  {
+    code: "IE_PAYE_MISMATCH",
+    descriptionTemplate: "PAYE does not match recalculated amount",
+    severity: "warning",
+    categories: ["tax", "compliance"],
+    appliesTo: { countries: ["IE"] },
+    evaluate: ({ current, config, ieContext }) => {
+      if (!config.ieConfig) return null;
+      const payeInputs = ieContext?.paye;
+      if (!payeInputs) return null;
+      const actualPaye =
+        typeof current.paye === "number" && Number.isFinite(current.paye) ? current.paye : null;
+      if (actualPaye === null) return null;
+      const grossPay =
+        typeof current.gross_pay === "number" && Number.isFinite(current.gross_pay)
+          ? current.gross_pay
+          : null;
+      const calc = calcIePaye(grossPay, config.ieConfig, payeInputs);
+      const delta = calc.netTax - actualPaye;
+      if (Math.abs(delta) <= IE_PAYE_MISMATCH_TOLERANCE) {
+        return null;
+      }
+      const formatNumber = (value: number) => Number(value.toFixed(2));
+      return applyIssue(
+        `PAYE expected ${formatAmount(calc.netTax)} but payslip shows ${formatAmount(actualPaye)}`,
+        "warning",
+        {
+          expectedTax: formatNumber(calc.netTax),
+          actualTax: formatNumber(actualPaye),
+          difference: formatNumber(delta),
+          standardBandUsed: formatNumber(calc.standardBandUsed),
+          higherBandUsed: formatNumber(calc.higherBandUsed),
+          standardTax: formatNumber(calc.standardTax),
+          higherTax: formatNumber(calc.higherTax),
+          creditsApplied: formatNumber(calc.creditsApplied),
+        }
       );
     },
   },

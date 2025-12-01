@@ -6,6 +6,7 @@ import {
   type RuleDefinition,
 } from "@/lib/rules/registry";
 import { getDefaultRuleConfig } from "@/lib/rules/config";
+import { calcIePaye } from "@/lib/rules/iePaye";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -29,7 +30,7 @@ const baseCurrent = {
 const defaultOptions = {
   country: "IE" as const,
   taxYear: 2025,
-  config: getDefaultRuleConfig("IE"),
+  config: getDefaultRuleConfig("IE", 2025),
 };
 
 describe("runRules", () => {
@@ -163,6 +164,39 @@ describe("runRules", () => {
     const diff = calculateDiff(basePrevious, baseCurrent);
     const issues = runRules(baseCurrent, basePrevious, diff, defaultOptions);
     expect(issues).toHaveLength(0);
+  });
+
+  it("flags IE PAYE mismatch when recalculated tax differs", () => {
+    const current = { ...baseCurrent, gross_pay: 4000, paye: 400 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      ...defaultOptions,
+      ieContext: {
+        paye: {
+          standardRateCutoff: 3500,
+          taxCredits: 300,
+        },
+      },
+    });
+    const mismatch = issues.find((issue) => issue.ruleCode === "IE_PAYE_MISMATCH");
+    expect(mismatch).toBeTruthy();
+    expect(mismatch?.data).toMatchObject({
+      expectedTax: expect.any(Number),
+      actualTax: expect.any(Number),
+      difference: expect.any(Number),
+    });
+  });
+
+  it("does not flag IE PAYE mismatch when within tolerance", () => {
+    const ieContext = { paye: { standardRateCutoff: 3500, taxCredits: 300 } };
+    const calc = calcIePaye(4000, defaultOptions.config.ieConfig!, ieContext.paye);
+    const current = { ...baseCurrent, gross_pay: 4000, paye: calc.netTax };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      ...defaultOptions,
+      ieContext,
+    });
+    expect(issues.map((i) => i.ruleCode)).not.toContain("IE_PAYE_MISMATCH");
   });
 
   it("consumes newly registered rules without engine changes", () => {

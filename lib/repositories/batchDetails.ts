@@ -38,7 +38,11 @@ type PayslipRecord = {
   id: string;
   employee_id: string;
   employees: { name: string | null; external_employee_ref: string | null } | null;
-  issues: { severity: IssueSeverity }[] | null;
+};
+
+type IssueRow = {
+  employee_id: string | null;
+  severity: IssueSeverity | null;
 };
 
 const emptyIssueCounts = (): Record<IssueSeverity, number> => ({
@@ -46,6 +50,52 @@ const emptyIssueCounts = (): Record<IssueSeverity, number> => ({
   warning: 0,
   info: 0,
 });
+
+export const buildEmployeeIssueSummaries = (
+  payslips: PayslipRecord[] | null | undefined,
+  issues: IssueRow[] | null | undefined
+): { employees: EmployeeIssueSummary[]; totals: Record<IssueSeverity, number> } => {
+  const issueMap = new Map<string, Record<IssueSeverity, number>>();
+  (issues ?? []).forEach((issue) => {
+    if (!issue.employee_id || !issue.severity || !ISSUE_LEVELS.includes(issue.severity)) {
+      return;
+    }
+    const counts = issueMap.get(issue.employee_id) ?? emptyIssueCounts();
+    counts[issue.severity] = (counts[issue.severity] ?? 0) + 1;
+    issueMap.set(issue.employee_id, counts);
+  });
+
+  const employees: EmployeeIssueSummary[] =
+    payslips?.map((payslip) => {
+      const issueCounts = issueMap.get(payslip.employee_id) ?? emptyIssueCounts();
+      const employeeData = payslip.employees as PayslipRecord["employees"];
+      return {
+        employeeId: payslip.employee_id,
+        employeeName:
+          employeeData && !Array.isArray(employeeData)
+            ? employeeData.name ?? "Employee"
+            : "Employee",
+        employeeRef:
+          employeeData && !Array.isArray(employeeData)
+            ? employeeData.external_employee_ref ?? null
+            : null,
+        payslipId: payslip.id,
+        issues: issueCounts,
+      };
+    }) ?? [];
+
+  const totals = Array.from(issueMap.values()).reduce(
+    (acc, counts) => {
+      ISSUE_LEVELS.forEach((level) => {
+        acc[level] += counts[level];
+      });
+      return acc;
+    },
+    emptyIssueCounts()
+  );
+
+  return { employees, totals };
+};
 
 export async function fetchBatchDetail(
   organisationId: string,
@@ -70,6 +120,16 @@ export async function fetchBatchDetail(
     throw new Error("Batch not found");
   }
 
+  const { data: issueRows, error: issuesError } = await supabase
+    .from("issues")
+    .select("employee_id, severity")
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId);
+
+  if (issuesError) {
+    throw new Error(`Failed to load issues: ${issuesError.message}`);
+  }
+
   const { data: payslips, error: payslipError } = await supabase
     .from("payslips")
     .select(
@@ -79,9 +139,6 @@ export async function fetchBatchDetail(
       employees:employees (
         name,
         external_employee_ref
-      ),
-      issues:issues (
-        severity
       )
     `
     )
@@ -92,43 +149,9 @@ export async function fetchBatchDetail(
     throw new Error(payslipError.message);
   }
 
-  const employees: EmployeeIssueSummary[] = (payslips ?? []).map(
-    (payslip) => {
-      const issueCounts = (payslip.issues ?? []).reduce(
-        (acc, issue) => {
-          if (issue.severity && ISSUE_LEVELS.includes(issue.severity)) {
-            const level = issue.severity as IssueSeverity;
-            acc[level] = (acc[level] ?? 0) + 1;
-          }
-          return acc;
-        },
-        emptyIssueCounts()
-      );
-
-      return {
-        employeeId: payslip.employee_id,
-        employeeName:
-          payslip.employees && !Array.isArray(payslip.employees)
-            ? ((payslip.employees as PayslipRecord["employees"])?.name ?? "Employee")
-            : "Employee",
-        employeeRef:
-          payslip.employees && !Array.isArray(payslip.employees)
-            ? (payslip.employees as PayslipRecord["employees"])?.external_employee_ref ?? null
-            : null,
-        payslipId: payslip.id,
-        issues: issueCounts,
-      };
-    }
-  ) ?? [];
-
-  const totals = employees.reduce(
-    (acc, employee) => {
-      ISSUE_LEVELS.forEach((level) => {
-        acc[level] += employee.issues[level];
-      });
-      return acc;
-    },
-    { critical: 0, warning: 0, info: 0 }
+  const { employees, totals } = buildEmployeeIssueSummaries(
+    payslips as PayslipRecord[] | null,
+    issueRows as IssueRow[] | null
   );
 
   return {

@@ -65,12 +65,19 @@ const sampleDetail = {
       payslipId: "p-1",
       issues: { critical: 1, warning: 2, info: 0 },
     },
+    {
+      employeeId: "emp-2",
+      employeeName: "Bob",
+      employeeRef: "EMP002",
+      payslipId: "p-2",
+      issues: { critical: 0, warning: 1, info: 1 },
+    },
   ],
   totals: {
-    employeesProcessed: 1,
+    employeesProcessed: 2,
     critical: 1,
-    warning: 2,
-    info: 0,
+    warning: 3,
+    info: 1,
   },
 };
 
@@ -87,21 +94,23 @@ describe("BatchDetailView", () => {
   it("renders summary metrics", () => {
     render(<BatchDetailView batchId="batch-1" />);
     const employeesCard = screen.getByText("Employees processed").parentElement;
-    expect(employeesCard).toHaveTextContent("1");
+    expect(employeesCard).toHaveTextContent("2");
     const criticalCard = screen.getByText("Critical issues").parentElement;
     expect(criticalCard).toHaveTextContent("1");
+    const warningCard = screen.getByText("Warnings").parentElement;
+    expect(warningCard).toHaveTextContent("3");
   });
 
   it("renders employees table", () => {
     render(<BatchDetailView batchId="batch-1" />);
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("EMP001")).toBeInTheDocument();
-    expect(screen.getByText("View")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /view/i })).toHaveLength(2);
   });
 
   it("links employees to the employee detail view", () => {
     render(<BatchDetailView batchId="batch-1" />);
-    const link = screen.getByRole("link", { name: /view/i });
+    const [link] = screen.getAllByRole("link", { name: /view/i });
     expect(link).toHaveAttribute(
       "href",
       "/clients/client-1/employees/emp-1?batchId=batch-1"

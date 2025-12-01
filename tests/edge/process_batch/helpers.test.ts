@@ -9,6 +9,7 @@ import {
 const sampleResponse = {
   Blocks: [
     { BlockType: "LINE", Text: "Payslip" },
+    { BlockType: "LINE", Text: "PRSI Class A1" },
     { BlockType: "LINE", Text: "Gross Pay: 3,000.00" },
     { BlockType: "LINE", Text: "PAYE: 600.00" },
     { BlockType: "LINE", Text: "USC/NI: 135.50" },
@@ -31,6 +32,7 @@ describe("normalizeTextractResponse", () => {
     expect(normalized.usc_ni).toBe(135.5);
     expect(normalized.pension_ee).toBe(150);
     expect(normalized.pension_er).toBe(180);
+    expect(normalized.prsi_category).toBe("A1");
     expect(normalized.raw_text).toContain("Gross Pay");
   });
 
@@ -71,6 +73,7 @@ describe("buildPayslipInsert", () => {
       pension_employee: 150,
       pension_employer: 180,
       storage_path: job.storage_path,
+      prsi_or_ni_category: "A1",
     });
     expect(payload.raw_ocr_json.raw_text).toContain("Payslip");
   });

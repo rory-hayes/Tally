@@ -53,11 +53,20 @@ describe("buildIssuesForPayslip", () => {
     expect(issues.map((issue) => issue.rule_code)).toContain("PRSI_CATEGORY_CHANGE");
   });
 
-  it("flags high pension percentages even when no previous payslip", () => {
-    const current = { ...basePayslip, gross_pay: 2000, pension_employee: 400, pension_employer: 350 };
-    const issues = buildIssuesForPayslip(current, null);
-    expect(issues.map((issue) => issue.rule_code)).toEqual(
-      expect.arrayContaining(["PENSION_EMPLOYEE_HIGH", "PENSION_EMPLOYER_HIGH"])
+  it("EMP003 triggers USC spike", () => {
+    const issues = capture({ usc_or_ni: 200, gross_pay: 3050 }, { usc_or_ni: 100, gross_pay: 3000 });
+    expect(issues.map((issue) => issue.rule_code)).toContain("USC_SPIKE");
+  });
+
+  it("EMP005 triggers pension_over_threshold for both EE and ER", () => {
+    const issues = capture({ gross_pay: 2000, pension_employee: 400, pension_employer: 320 }, null);
+    const pensionIssues = issues.filter((issue) => issue.rule_code === "PENSION_OVER_THRESHOLD");
+    expect(pensionIssues).toHaveLength(2);
+    expect(pensionIssues.map((issue) => issue.description)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/Employee pension contribution/),
+        expect.stringMatching(/Employer pension contribution/),
+      ])
     );
   });
 

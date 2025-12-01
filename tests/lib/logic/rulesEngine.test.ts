@@ -55,12 +55,25 @@ describe("runRules", () => {
     expect(issues.map((i) => i.ruleCode)).toContain("PRSI_CATEGORY_CHANGE");
   });
 
-  it("detects high pension percentage", () => {
-    const current = { ...baseCurrent, gross_pay: 2000, pension_employee: 400, pension_employer: 400 };
+  it("flags USC spike without gross change", () => {
+    const current = { ...baseCurrent, usc_or_ni: 200, gross_pay: 3050 };
+    const previous = { ...basePrevious, usc_or_ni: 100, gross_pay: 3000 };
+    const diff = calculateDiff(previous, current);
+    const issues = runRules(current, previous, diff);
+    expect(issues.map((i) => i.ruleCode)).toContain("USC_SPIKE");
+  });
+
+  it("detects high pension percentage for both employee and employer", () => {
+    const current = { ...baseCurrent, gross_pay: 2000, pension_employee: 400, pension_employer: 320 };
     const diff = calculateDiff(basePrevious, current);
     const issues = runRules(current, basePrevious, diff);
-    expect(issues.map((i) => i.ruleCode)).toEqual(
-      expect.arrayContaining(["PENSION_EMPLOYEE_HIGH", "PENSION_EMPLOYER_HIGH"])
+    const pensionIssues = issues.filter((i) => i.ruleCode === "PENSION_OVER_THRESHOLD");
+    expect(pensionIssues).toHaveLength(2);
+    expect(pensionIssues.map((issue) => issue.description)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/Employee pension contribution/),
+        expect.stringMatching(/Employer pension contribution/),
+      ])
     );
   });
 

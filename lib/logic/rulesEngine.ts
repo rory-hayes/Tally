@@ -6,10 +6,10 @@ export type RuleCode =
   | "NET_CHANGE_LARGE"
   | "GROSS_CHANGE_LARGE"
   | "TAX_SPIKE_WITHOUT_GROSS"
+  | "USC_SPIKE"
   | "YTD_REGRESSION"
   | "PRSI_CATEGORY_CHANGE"
-  | "PENSION_EMPLOYEE_HIGH"
-  | "PENSION_EMPLOYER_HIGH";
+  | "PENSION_OVER_THRESHOLD";
 
 export type IssueCandidate = {
   ruleCode: RuleCode;
@@ -34,6 +34,7 @@ type RuleContext = {
 const NET_CHANGE_THRESHOLD = 15; // %
 const GROSS_CHANGE_THRESHOLD = 15; // %
 const TAX_SPIKE_THRESHOLD = 20; // %
+const USC_SPIKE_THRESHOLD = 20; // %
 const MAX_GROSS_DELTA_FOR_TAX_SPIKE = 5; // %
 const PENSION_PERCENT_THRESHOLD = 12; // %
 
@@ -57,6 +58,11 @@ const RULE_DEFINITIONS: Record<RuleCode, RuleDefinition> = {
     buildDescription: ({ percentChange }) =>
       `PAYE increased by ${formatPercent(percentChange)} while gross pay stayed flat`,
   },
+  USC_SPIKE: {
+    severity: "warning",
+    buildDescription: ({ percentChange }) =>
+      `USC/NI increased by ${formatPercent(percentChange)} while gross pay stayed flat`,
+  },
   YTD_REGRESSION: {
     severity: "critical",
     buildDescription: ({ fieldLabel, previous, current }) =>
@@ -66,15 +72,10 @@ const RULE_DEFINITIONS: Record<RuleCode, RuleDefinition> = {
     severity: "info",
     buildDescription: ({ detail }) => `PRSI/NI category changed ${detail ?? ""}`.trim(),
   },
-  PENSION_EMPLOYEE_HIGH: {
+  PENSION_OVER_THRESHOLD: {
     severity: "warning",
-    buildDescription: ({ percentChange }) =>
-      `Employee pension contribution is ${formatPercent(percentChange)} of gross pay`,
-  },
-  PENSION_EMPLOYER_HIGH: {
-    severity: "info",
-    buildDescription: ({ percentChange }) =>
-      `Employer pension contribution is ${formatPercent(percentChange)} of gross pay`,
+    buildDescription: ({ detail, percentChange }) =>
+      `${detail ?? "Pension contribution"} is ${formatPercent(percentChange)} of gross pay`,
   },
 };
 
@@ -88,12 +89,13 @@ const pushIssue = (
   issues: IssueCandidate[],
   ruleCode: RuleCode,
   context: RuleContext = {},
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  severityOverride?: IssueSeverity
 ) => {
   const definition = RULE_DEFINITIONS[ruleCode];
   issues.push({
     ruleCode,
-    severity: definition.severity,
+    severity: severityOverride ?? definition.severity,
     description: definition.buildDescription(context),
     metadata,
   });
@@ -157,7 +159,20 @@ export const runRules = (
     });
   }
 
-  // Rule 4: YTD regressions
+  // Rule 4: USC/NI spike without gross change
+  if (
+    hasPreviousData(diff.usc_or_ni) &&
+    diff.usc_or_ni.percentChange !== null &&
+    Math.abs(diff.usc_or_ni.percentChange) >= USC_SPIKE_THRESHOLD &&
+    (diff.gross_pay.percentChange === null ||
+      Math.abs(diff.gross_pay.percentChange) <= MAX_GROSS_DELTA_FOR_TAX_SPIKE)
+  ) {
+    pushIssue(issues, "USC_SPIKE", {
+      percentChange: diff.usc_or_ni.percentChange,
+    });
+  }
+
+  // Rule 5: YTD regressions
   ["ytd_gross", "ytd_net", "ytd_tax", "ytd_usc_or_ni"].forEach((field) => {
     const entry = diff[field as keyof PayslipDiff];
     if (hasPreviousData(entry) && entry.current !== null && entry.current < (entry.previous ?? 0)) {
@@ -169,7 +184,7 @@ export const runRules = (
     }
   });
 
-  // Rule 5: PRSI/NI category change
+  // Rule 6: PRSI/NI category change
   const prevCategory = previous?.prsi_or_ni_category?.trim().toUpperCase();
   const currCategory = current?.prsi_or_ni_category?.trim().toUpperCase();
   if (prevCategory && currCategory && prevCategory !== currCategory) {
@@ -178,20 +193,32 @@ export const runRules = (
     });
   }
 
-  // Rule 6: Pension percentage higher than threshold
+  // Rule 7: Pension percentage higher than threshold
   const grossCurrent = diff.gross_pay.current ?? null;
   const employeePercent = pensionPercent(current.pension_employee ?? null, grossCurrent);
   if (employeePercent !== null && employeePercent >= PENSION_PERCENT_THRESHOLD) {
-    pushIssue(issues, "PENSION_EMPLOYEE_HIGH", {
-      percentChange: employeePercent,
-    });
+    pushIssue(
+      issues,
+      "PENSION_OVER_THRESHOLD",
+      {
+        detail: "Employee pension contribution",
+        percentChange: employeePercent,
+      },
+      "warning"
+    );
   }
 
   const employerPercent = pensionPercent(current.pension_employer ?? null, grossCurrent);
   if (employerPercent !== null && employerPercent >= PENSION_PERCENT_THRESHOLD) {
-    pushIssue(issues, "PENSION_EMPLOYER_HIGH", {
-      percentChange: employerPercent,
-    });
+    pushIssue(
+      issues,
+      "PENSION_OVER_THRESHOLD",
+      {
+        detail: "Employer pension contribution",
+        percentChange: employerPercent,
+      },
+      "info"
+    );
   }
 
   return issues;

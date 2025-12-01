@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Tally MVP Roadmap</title>
+  <title>Tally – Post-MVP Roadmap (Milestones 10–12)</title>
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; line-height: 1.5; }
     h1, h2, h3 { margin-top: 1.5rem; }
@@ -16,1449 +16,190 @@
   </style>
 </head>
 <body>
-  <h1>Tally MVP Roadmap</h1>
-  <p>
-    This roadmap is the single, versioned source of truth for building the Tally MVP.
-    Each task is a small, well-defined chunk with a Cursor prompt, a clear Definition of Done,
-    and TDD guidance. Always keep <code>agent.md</code>, <code>architecture.md</code> and <code>design.md</code> in sync.
-  </p>
+  <h1>Tally – Post-MVP Roadmap</h1>
+  <p>This roadmap defines Milestones 10 through 12, based on QA results from the live MVP and aligned with upcoming production readiness.</p>
 
-  <h2>Milestone 0 – Repo Structure, Docs & Tooling</h2>
+  <h2>Milestone 10 – Hardening, Bugfixes & UI Polish</h2>
 
   <details>
-    <summary>
-      <input type="checkbox" /> M0.1 – Create base folder structure and initialise Node/Next project
-      <span class="done-label">(repo & framework skeleton)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Ensure the repo has a clear structure for frontend, docs, and future backend code. Initialise a basic Next.js project
-      (we will later integrate Ant Design). This sets the baseline for all subsequent tasks.
-    </p>
-
+    <summary>M10.1 – Fix missing rule triggers (USC spike, Pension %, PRSI/NI category)</summary>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Create a clean base folder structure and initialise a Next.js app for Tally.
-//
+    <pre><code>// Goal: Ensure all defined rules in runRules() are correctly invoked and result in issue creation.
+
+// Fix rules that are currently not triggering:
+// - USC/NI spike (threshold >20%)
+// - Pension % (EE >=12%, ER >=12%)
+// - PRSI or NI category change
+
 // Before you start:
-// - Read agent.md for project context and expectations.
-// - Read architecture.md for MVP architecture.
-// - Read design.md for UI principles.
-//
+// - Use the synthetic payslips (EMP003, EMP005) to validate fix.
+// - Ensure normalisation step extracts usc_ni, pension_employee, pension_employer, prsi_category fields.
+
+// Definition of Done:
+// - EMP003 triggers usc_spike
+// - EMP005 triggers pension_over_threshold
+// - EMP with PRSI change triggers info issue (if supported in test data)
+// - Unit tests confirm each rule fires under expected inputs.
+    </code></pre>
+  </details>
+
+  <details>
+    <summary>M10.2 – Fix pay date source on Employee Detail view</summary>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>// Goal: Display the correct payslip pay date on the employee diff view.
+
+// Issue: Currently shows today's date (new Date()), not the actual period.
+// Fix:
+// - Update the payslip ingestion logic to extract and store the correct pay date (if possible)
+// - Alternatively, fall back to batch.period_label or a derived date from the payslip.
+
+// Definition of Done:
+// - Employee view shows accurate pay dates (e.g. 2025-01 and 2025-02)
+// - Unit test verifies the displayed value matches stored data.
+    </code></pre>
+  </details>
+
+  <details>
+    <summary>M10.3 – Fix batch + dashboard issue counts</summary>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>// Goal: Ensure issue counts by severity are accurate across batch and dashboard views.
+
+// Symptoms:
+// - EMP003 shows 0 warnings in batch table, but should show 1.
+// - Batch summary card counts may mismatch actual inserted issues.
+
+// Fix:
+// - Re-query issues table correctly with severity filters.
+// - Re-validate aggregation logic for employees.
+
+// Definition of Done:
+// - Dashboard shows accurate issue summary per client
+// - Batch detail summary shows correct critical/warning/info totals
+// - Employee row shows accurate per-employee issue counts
+// - Add tests for issue aggregation functions with synthetic data
+    </code></pre>
+  </details>
+
+  <details>
+    <summary>M10.4 – Improve Upload & Processing Feedback</summary>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>// Goal: Improve UX around file upload and batch processing visibility.
+
 // Requirements:
-// - Root-level folders: /app or /src (depending on Next.js router choice), /docs, /scripts, /tests.
-// - Place empty docs: docs/agent.md, docs/architecture.md, docs/design.md (we will fill them next).
-// - Initialise a Next.js project (TypeScript enabled).
-//
+// - Fix bug where file picker opens and causes 404
+// - After upload: show confirmation (toast), disable re-click
+// - While processing: show a spinner or message in Batch UI
+// - If a job fails: display that X/Y files processed and which failed
+
 // Definition of Done:
-// - I can run `npm install` and `npm run dev` and see the default Next.js page.
-// - The folder structure exists and is committed.
-// - No TypeScript or build errors.
+// - Upload UI never navigates away (404 bug fixed)
+// - Toast confirms upload + job creation
+// - Batch page displays progress and handles partial failure
+// - UI tests simulate each of these paths with mocked state
     </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Next.js (TypeScript) project exists in the repo root.</li>
-      <li>Folders: <code>/docs</code>, <code>/tests</code>, <code>/scripts</code> created.</li>
-      <li>Empty <code>docs/agent.md</code>, <code>docs/architecture.md</code>, <code>docs/design.md</code> present.</li>
-      <li><code>npm run dev</code> works with no TS or build errors.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>No tests required yet; this is infrastructure setup.</li>
-    </ul>
   </details>
 
   <details>
-    <summary>
-      <input type="checkbox" /> M0.2 – Populate agent.md, architecture.md, design.md (initial drafts)
-      <span class="done-label">(project guardrails)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Copy the initial content for <code>agent.md</code>, <code>architecture.md</code>, and <code>design.md</code> into the repo.
-      These documents will guide all future tasks and help Cursor stay aligned.
-    </p>
-
+    <summary>M10.5 – Fix issue resolution & table refresh logic</summary>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Populate docs/agent.md, docs/architecture.md, and docs/design.md with the agreed initial content.
-//
-// Before you start:
-// - Use the latest agreed versions of these docs from our planning conversation.
-// - Ensure they reflect Supabase + Vercel + Next.js + Ant Design + OCR via external API.
-//
+    <pre><code>// Goal: Ensure marking issues as resolved updates both UI and database correctly.
+
+// Fix:
+// - After resolving/unresolving, batch employee table should refresh
+// - Employee issue count should reflect resolved/unresolved status
+
 // Definition of Done:
-// - docs/agent.md describes Tally, MVP scope, coding expectations, and references architecture.md and design.md.
-// - docs/architecture.md describes entities, Supabase-based architecture, pipeline, and migration path.
-// - docs/design.md defines UI layout, Ant Design usage, screens, and non-goals.
-//
-// After this task, all future tasks should reference these docs.
+// - Marking an issue as resolved reflects immediately in batch summary
+// - Resolved issue still visible (greyed, struck through)
+// - Unresolved issues update counts appropriately
+// - Add tests for resolution toggle effect on state
     </code></pre>
+  </details>
 
-    <h4>Definition of Done</h4>
-    <ul>
-      <li><code>docs/agent.md</code> populated with AI assistant instructions and MVP scope.</li>
-      <li><code>docs/architecture.md</code> populated with system/data architecture and Supabase-centric design.</li>
-      <li><code>docs/design.md</code> populated with UI/UX guidelines and key screens.</li>
-      <li>Docs committed to Git.</li>
-    </ul>
+  <h2>Milestone 11 – Pre-Launch Enhancements</h2>
 
-    <h4>Tests</h4>
-    <ul>
-      <li>No automated tests; manual review that docs are present and readable.</li>
-    </ul>
+  <details>
+    <summary>M11.1 – Implement audit log tracking for key actions</summary>
+    <h4>Prompt for Cursor</h4>
+    <pre><code>// Goal: Begin writing to audit_logs table for traceability.
+
+// Events to log:
+// - Batch created
+// - Payslips uploaded
+// - Issues marked resolved/unresolved
+
+// Definition of Done:
+// - Each action creates audit_log row with actor, action_type, metadata, and timestamp
+// - Metadata includes batch ID, employee ID, or issue ID as applicable
+// - DB test confirms row inserted for each case
+    </code></pre>
   </details>
 
   <details>
-    <summary>
-      <input type="checkbox" /> M0.3 – Set up testing framework (Vitest + React Testing Library)
-      <span class="done-label">(testing foundation)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add a test runner and basic component testing setup so all future work follows TDD. This is foundational for the
-      whole MVP.
-    </p>
-
+    <summary>M11.2 – Store and display resolved_by user + timestamp</summary>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add Vitest + React Testing Library to the Next.js project and configure a basic smoke test.
-//
-// Before you start:
-// - Skim agent.md to align on TDD expectations.
-// - Confirm Next.js setup from M0.1.
-//
-// Requirements:
-// - Vitest configured to work with Next.js + TypeScript.
-// - React Testing Library installed for component testing.
-// - `npm test` (or `npm run test`) runs the test suite.
-//
+    <pre><code>// Goal: Populate resolved_by and resolved_at in issues when marked resolved.
+
+// Update:
+// - Extend resolution mutation to capture user ID and timestamp
+// - Display on issue tooltip: "Resolved by [user] on [date/time]"
+
 // Definition of Done:
-// - A sample test renders the main page and asserts a "Tally" or "Dashboard" heading exists.
-// - Tests pass locally.
-// - Test command is documented in package.json scripts.
+// - Resolved issues show tooltip with user + date
+// - DB row contains resolved_by, resolved_at
+// - Manual test confirms resolution attribution is recorded
     </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Vitest and React Testing Library installed and configured.</li>
-      <li><code>npm test</code> runs Vitest and shows the sample test passing.</li>
-      <li>One smoke test verifies the root page renders a basic heading/element.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Smoke test for the main page exists and passes.</li>
-    </ul>
   </details>
 
   <details>
-    <summary>
-      <input type="checkbox" /> M0.4 – Global test run & CI script
-      <span class="done-label">(baseline CI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add a simple CI configuration (even if local-only for now) to ensure tests are run consistently. This will be reused for
-      future tasks and prevents regressions.
-    </p>
-
+    <summary>M11.3 – Surface failed payslip jobs in UI</summary>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add a basic CI script or GitHub Action for running tests.
-//
-// Requirements:
-// - GitHub Actions workflow, or a simple script documented in README that runs `npm test`.
-// - The workflow should run on pushes and PRs to main branches.
-//
+    <pre><code>// Goal: Make failed jobs visible in the batch view for troubleshooting.
+
+// When a job fails:
+// - It should not silently be skipped
+// - UI should show a badge or warning e.g. "9 of 10 processed – 1 failed"
+
 // Definition of Done:
-// - CI config lives in .github/workflows (if using GitHub).
-// - Pushing to the repo triggers the tests and shows green when passing.
-// - README briefly mentions how to run tests locally and that CI exists.
+// - Failed jobs appear in the batch file summary
+// - Employee count reflects only successful payslips
+// - User can see which file(s) failed
     </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>CI workflow (e.g. GitHub Actions) configured to run <code>npm test</code> on push/PR.</li>
-      <li>README updated with testing instructions.</li>
-      <li>CI green on latest commit.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Existing tests from M0.3 pass in CI.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 1 – Next.js Layout & Ant Design Integration</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M1.1 – Integrate Ant Design and build base layout shell
-      <span class="done-label">(UI skeleton)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Integrate Ant Design into the Next.js app and create a reusable layout component with sidebar and header,
-      following <code>design.md</code>.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Integrate Ant Design into Next.js and implement the base app layout.
-//
-// Before you start:
-// - Read design.md for layout and component guidelines.
-// - Re-check agent.md for code quality expectations.
-//
-// Requirements:
-// - Install Ant Design and set up global styles (CSS or Less as appropropriate).
-// - Create a Layout component using Ant Design's Layout.Sider, Layout.Header, Layout.Content.
-// - Add a basic navigation menu (Dashboard, Clients, Settings) as placeholders.
-//
-// Definition of Done:
-// - The root page uses the new Layout component.
-// - Sidebar, header, and content area render correctly.
-// - There are no style or build errors.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Ant Design installed and globally configured.</li>
-      <li>A reusable <code>&lt;AppLayout&gt;</code> (or similar) component exists and is used by main pages.</li>
-      <li>Navigation menu with placeholder links is visible.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component test that renders the layout and asserts presence of header and sider elements.</li>
-    </ul>
   </details>
 
   <details>
-    <summary>
-      <input type="checkbox" /> M1.2 – Tests: Layout & navigation
-      <span class="done-label">(UI TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Strengthen tests around the new layout: verify that core navigation sections exist and render consistently.
-    </p>
-
+    <summary>M11.4 – YTD and PRSI field extraction</summary>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests around the Ant Design layout and navigation.
-//
-// Requirements:
-// - Test that the layout renders the sidebar, header, and content regions.
-// - Test that the navigation menu shows "Dashboard", "Clients", and "Settings".
-//
+    <pre><code>// Goal: Extend Textract normalization to extract:
+// - YTD gross/net/PAYE/USC
+// - PRSI or NI category
+
+// Update:
+// - Add regex patterns to match YTD values from OCR text
+// - Store in payslip fields ytd_* and prsi_or_ni_category
+
 // Definition of Done:
-// - Tests fail before implementation if assertions are added first.
-// - All layout/navigation tests pass afterwards.
-// - No existing test is broken.
+// - EMP payslips parse and store YTD values where present
+// - PRSI category field populated from OCR
+// - Unit test confirms correct values extracted from representative OCR lines
     </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>At least one test asserts that nav menu items are rendered.</li>
-      <li>All tests passing locally and in CI.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>New tests for layout/nav behaviour added and passing.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 2 – Supabase Schema & Integration</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M2.1 – Define Supabase schema (core tables)
-      <span class="done-label">(DB foundation)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Create the initial Supabase schema based on <code>architecture.md</code> for organisations, users, clients, batches, employees, payslips, issues, and audit_logs.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Create SQL migration(s) or SQL files for the initial Supabase schema.
-//
-// Before you start:
-// - Carefully review architecture.md entity definitions.
-// - Ensure naming and types match the document.
-//
-// Requirements:
-// - Tables: organisations, profiles/users, clients, batches, employees, payslips, issues, audit_logs.
-// - Use appropriate types for IDs (UUID), timestamps, and JSONB where specified.
-//
-// Definition of Done:
-// - Schema is represented as SQL in the repo (e.g., under /scripts or /supabase).
-// - Running the SQL against Supabase creates all tables successfully.
-// - The schema aligns with architecture.md.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>SQL file(s) for all core tables committed.</li>
-      <li>Supabase DB schema matches <code>architecture.md</code>.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Optional: Script or test that runs a basic query against each table (smoke test).</li>
-    </ul>
   </details>
 
   <details>
-    <summary>
-      <input type="checkbox" /> M2.2 – Configure RLS (Row-Level Security) for multi-tenancy
-      <span class="done-label">(data isolation)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement Supabase Row-Level Security policies to ensure that users can only access rows belonging to their organisation.
-    </p>
-
+    <summary>M11.5 – Add employee count to client list and batch</summary>
     <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement Supabase RLS policies for multi-tenancy.
-//
-// Before you start:
-// - Re-read the multi-tenancy model in architecture.md.
-// - Confirm how profiles/users are linked to organisations.
-//
-// Requirements:
-// - RLS enabled for all sensitive tables (organisations, clients, batches, employees, payslips, issues, audit_logs).
-// - Policies that check `organisation_id` matches the user's organisation via auth.uid() -> profile -> organisation.
-//
+    <pre><code>// Goal: Show number of employees processed per batch and per client.
+
+// Client page:
+// - Add "Employees processed" column
+// Batch table:
+// - Show employee count once payslips are processed
+
 // Definition of Done:
-// - Unauthenticated users cannot read any data.
-// - A test or manual query shows that a user in Org A cannot see Org B's items.
-// - Policies are committed as SQL or documented.
+// - Employee count appears for each batch row
+// - Client list aggregates unique employees across all batches
+// - Test for aggregation logic with mocked data
     </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>RLS enabled and policies defined for all core tables.</li>
-      <li>Verified cross-org access is blocked.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Manual or automated tests that simulate two organisations and verify isolation.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M2.3 – Set up Supabase client in Next.js
-      <span class="done-label">(frontend–backend wiring)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Wire Supabase into the frontend using the official client, with environment variables, ready for auth and data access.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add Supabase client configuration to the Next.js app and a simple test query.
-//
-// Before you start:
-// - Re-read agent.md to ensure we use env vars and don't leak secrets.
-// - Follow architecture.md for where Supabase fits.
-//
-// Requirements:
-// - Use environment variables for Supabase URL and anon key.
-// - Export a helper to create a Supabase client on the client side (and server side if needed).
-// - Implement a simple hook or page that fetches e.g. a list of organisations or clients.
-//
-// Definition of Done:
-// - Supabase client helper exists and is used in a sample component.
-// - The sample call works against your Supabase project (even if it returns an empty list).
-// - No secrets are exposed beyond the anon key.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Supabase client helper module created.</li>
-      <li>Sample page or component successfully queries Supabase.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Test that uses mocking to ensure the component handles success/empty/error states.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M2.4 – Tests: Schema & Supabase integration
-      <span class="done-label">(integration TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add basic tests to ensure the schema assumptions hold in code (e.g., types, minimal repository functions).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests around the Supabase integration layer.
-//
-// Requirements:
-// - Create minimal repository functions (e.g., getClientsForOrganisation).
-// - Write tests (with mocks) to verify that these functions call Supabase with correct filters and handle responses.
-//
-// Definition of Done:
-// - At least one test for a repo function verifying organisation scoping.
-// - All tests passing locally and in CI.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Repository/helper functions covered by basic tests.</li>
-      <li>All tests passing.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 3 – Auth & Organisation Onboarding</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M3.1 – Implement email/password auth with Supabase
-      <span class="done-label">(sign up / login UI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement basic sign up and login flows using Supabase Auth, with appropriate redirections and guarded routes.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add signup and login flows using Supabase Auth.
-//
-// Before you start:
-// - Check agent.md for security and UX expectations.
-// - Refer to design.md for login screen layout.
-//
-// Requirements:
-// - /login and /signup pages using Ant Design Form/Input/Button.
-// - On successful login/signup, user is redirected to the dashboard.
-// - Auth state stored via Supabase client; unauthenticated users redirected to login.
-//
-// Definition of Done:
-// - I can create a user and log in against Supabase Auth.
-// - Protected pages cannot be accessed unauthenticated.
-// - Login UI matches design.md guidelines reasonably.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>/login and /signup pages implemented with Ant Design.</li>
-      <li>Auth state integrated; unauthenticated users redirected.</li>
-      <li>Manual test: create account and see dashboard.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests for login form behaviour (field validation, call handler).</li>
-      <li>Optional: integration-style test for redirect logic.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M3.2 – Link users to organisations (org creation on first login)
-      <span class="done-label">(multi-tenancy wiring)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Ensure each user is associated with an organisation; on first login, the user creates or is assigned to an org. This underpins multi-tenancy.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Ensure each user is linked to exactly one organisation.
-//
-// Before you start:
-// - Re-read multi-tenancy section of architecture.md.
-//
-// Requirements:
-// - Create a `profiles` or `users` table that links Supabase auth user -> organisation_id and role.
-// - On first successful signup/login, if no profile exists, show a simple "Create organisation" flow.
-// - Store organisation_id and role in profile.
-//
-// Definition of Done:
-// - New users are guided through creating an organisation.
-// - Profile rows are created correctly in Supabase.
-// - Authenticated requests can determine user's organisation_id.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Profiles table exists and is used.</li>
-      <li>New users must create/select an organisation before seeing dashboard.</li>
-      <li>Organisation context available in frontend.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Tests for organisation creation flow (form submission, profile write).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M3.3 – Tests: Auth & org guards
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add tests to ensure that protected routes cannot be accessed without auth and that organisation context is required.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests around auth guards and organisation context.
-//
-// Requirements:
-// - Test that an unauthenticated user is redirected when trying to access dashboard/clients.
-// - Test that the organisation creation flow is triggered when profile is incomplete.
-//
-// Definition of Done:
-// - Tests fail before guard logic is in place (if not implemented yet).
-// - All auth-related tests pass afterwards.
-// - No regressions in existing tests.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Auth/guard tests added and passing.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 4 – Client Management</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M4.1 – Backend: Client CRUD operations
-      <span class="done-label">(clients data layer)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement Supabase-based CRUD operations for clients (create, list, update, delete) scoped to the current organisation.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement client CRUD operations in a thin data access layer.
-//
-// Requirements:
-// - Repository/helper functions: createClient, getClientsForOrg, updateClient, deleteClient.
-// - All functions must filter by organisation_id from the current user context.
-//
-// Definition of Done:
-// - Helper functions exist and are used by frontend components.
-// - Organisation scoping enforced (cannot list other orgs' clients).
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Client repository functions created and committed.</li>
-      <li>Manual verification: clients created appear only for that organisation.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests for repository functions (using mocks) verifying correct filtering.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M4.2 – Frontend: Clients list & create form
-      <span class="done-label">(Clients UI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Build the Clients page: table of clients with basic info and a modal/form to add a new client, following <code>design.md</code>.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement Clients page UI using Ant Design.
-//
-// Before you start:
-// - Refer to design.md section on Client Detail & list.
-//
-// Requirements:
-// - Clients page that lists all clients in a table (Name, Country, Payroll System, Actions).
-// - "Add client" button opens a modal with Ant Design Form (name, country, payroll system).
-// - On submit, calls createClient() and refreshes list.
-//
-// Definition of Done:
-// - I can create, view, and (optionally) edit/delete clients via the UI.
-// - UI respects layout and styling guidelines in design.md.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Clients page integrated into sidebar nav.</li>
-      <li>New clients created via UI appear in table.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests for create client form behaviour: validation, successful submission.</li>
-      <li>Snapshot or structure tests for client table rendering.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M4.3 – Tests: Clients workflow
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add tests covering the end-to-end “add client and see it listed” flow at the UI/component level (with mocks).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Strengthen tests around Clients workflow.
-//
-// Requirements:
-// - Test that the "Add client" button opens modal.
-// - Test that submitting valid data calls the repository and closes modal.
-// - Test that the table updates when new client is added (via mocked response).
-//
-// Definition of Done:
-// - These tests fail before implementation (if not done) and pass after.
-// - All previous tests remain green.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Workflow tests for client creation added and passing.</li>
-    </ul>
-  </details>
-
-  
-  <h2>Milestone 5 – Batches & File Upload</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M5.1 – Backend: Batch model & creation helper
-      <span class="done-label">(batches data layer)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement data access for creating and listing batches associated to clients, including status fields and file counts.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement the Batch data layer.
-//
-// Requirements:
-// - Functions: createBatchForClient, getBatchesForClient, updateBatchStatus.
-// - Batches must store: organisation_id, client_id, period_label, status, total_files, processed_files.
-//
-// Definition of Done:
-// - Functions usable by UI and processing pipeline.
-// - Batches read/write path tested at least minimally.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Batch helper functions implemented.</li>
-      <li>Manual DB check: batches created correctly with proper fields.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests for batch helper functions (mocking Supabase client).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M5.2 – Frontend: Client detail & create batch UI
-      <span class="done-label">(batch creation UI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Create the Client detail page with batch history and a form/modal to create a new batch (with period, notes).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement Client detail page with batch creation.
-//
-// Before you start:
-// - Check design.md for Client Detail and Batch Review sections.
-//
-// Requirements:
-// - Client detail page accessed from Clients list.
-// - Show client info plus table of batches (period, status, employees/placeholder).
-// - "Upload batch" button: creates a new batch with period_label and notes, then navigates to batch upload view.
-//
-// Definition of Done:
-// - I can navigate from Clients -> Client detail -> Create batch.
-// - Newly created batch appears in the list with correct status (e.g., "pending upload" or similar).
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Client detail page wired up and showing batches.</li>
-      <li>Batch creation from UI works.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests for batch creation form.</li>
-      <li>Tests that new batch appears in table after creation (with mocked repository calls).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M5.3 – Frontend & Supabase: File upload to Storage for a batch
-      <span class="done-label">(payslip upload flow)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement the payslip upload flow: users can upload multiple PDFs/ZIP against a specific batch, stored in a Supabase Storage bucket under a batch-specific prefix.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement file upload to Supabase Storage for a batch.
-//
-// Requirements:
-// - Use Supabase Storage (private bucket) to store payslips.
-// - On the batch page, show an Upload.Dragger (or similar) from Ant Design.
-// - Files uploaded should be associated with the batch (e.g. by prefix "batches/{batch_id}/").
-// - Update batch.total_files accordingly.
-//
-// Definition of Done:
-// - I can upload multiple PDFs to a batch.
-// - Files are visible in the Supabase Storage UI under the expected path.
-// - Batch.total_files is updated.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Upload UI integrated into Batch view.</li>
-      <li>Files stored in Supabase Storage with batch-specific paths.</li>
-      <li><code>batches.total_files</code> updated correctly.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Tests that upload UI calls the storage helper correctly (mock Supabase client).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M5.4 – Tests: Batch & upload workflow
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Ensure the end-to-end UX for creating a batch and uploading files is covered by tests (mocking Supabase).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests covering the batch creation + upload flow.
-//
-// Requirements:
-// - Test: from Client detail, clicking "Upload batch" leads to batch creation and upload UI being shown.
-// - Test: file selection triggers the upload handler.
-//
-// Definition of Done:
-// - UI tests simulate these flows using mocks.
-// - All previous tests remain green.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>End-to-end-like component tests added for batch creation and upload.</li>
-    </ul>
-  </details>
-
-  <h2>Resume from milstone 6 - all above completed</h2>
-  <h2>Milestone 6 – Processing Pipeline & OCR Integration</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M6.1 – Define processing_jobs table and batch statuses
-      <span class="done-label">(job model)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add a simple table to track processing jobs per uploaded file and refine batch status fields to support processing states.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Create processing_jobs table and align batch statuses.
-//
-// Before you start:
-// - Update architecture.md with the processing_jobs table if not present.
-//
-// Requirements:
-// - processing_jobs: id, organisation_id, client_id, batch_id, storage_path, status, error (nullable), created_at, updated_at.
-// - batch.status must support 'pending', 'processing', 'completed', 'failed'.
-//
-// Definition of Done:
-// - SQL migration for processing_jobs exists and applied in Supabase.
-// - Batches can be updated to new statuses from code.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li><code>processing_jobs</code> table created.</li>
-      <li><code>batches.status</code> supports required values.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Optional: minimal tests for any helper functions interacting with processing_jobs.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M6.2 – Edge Function: seed jobs for a batch
-      <span class="done-label">(job creation)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement a Supabase Edge Function that, given a batch_id, enumerates files in Storage for that batch and creates processing_jobs rows.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement an Edge Function to create processing_jobs for a batch.
-//
-// Requirements:
-// - Input: batch_id (from authenticated user/organisation).
-// - Enumerate files in storage under the batch prefix.
-// - Insert one processing_jobs row per file.
-// - Set batch.status = 'processing'.
-//
-// Definition of Done:
-// - Calling this function for a batch with uploaded files creates corresponding jobs.
-// - Batch status is updated from 'pending' to 'processing'.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Edge Function deployed and callable from frontend.</li>
-      <li>processing_jobs rows created for each file.</li>
-      <li>Batch status updated.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests for pure logic (e.g., mapping storage paths to job inserts).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M6.3 – Edge Function (cron): process jobs and call OCR
-      <span class="done-label">(OCR pipeline)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement a scheduled Edge Function that processes a small number of pending jobs on each run, calling an external OCR API, and writing results into payslips table.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement cron-based job processor for OCR + payslip insert.
-//
-// Before you start:
-// - Refine any parsing/normalisation details in architecture.md.
-//
-// Requirements:
-// - Function selects N pending jobs (status='pending') for the current run.
-// - For each job: download file from Storage, call OCR API, parse result, normalise data, insert into payslips.
-// - Update job status ('completed' or 'failed') and store error if any.
-// - Increment batch.processed_files and set batch.status to 'completed' when all jobs are done.
-//
-// Definition of Done:
-// - Manually seeding a few jobs and running the function results in payslips rows being created.
-// - Jobs statuses update correctly.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Scheduled job processor Edge Function created.</li>
-      <li>OCR integration stubbed or pointing to real API.</li>
-      <li>Payslips created from processed jobs.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests for parsing/normalisation logic (mock OCR response).</li>
-      <li>Tests for job state transitions (pending → completed/failed) using mocked DB calls.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> START HERE M6.4 – Implement OCR API
-      <span class="done-label">(OCR pipeline)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement OCR API
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// TBC
-    </code></pre>
-
-    
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M6.5 – Parse Textract payload into payslip fields
-      <span class="done-label">(structured OCR values)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Take the raw Textract response and map key numeric fields (gross/net pay, PAYE, USC/NI, pensions) into the structured payslip columns so downstream diffs and rules have real data.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Extract numeric payslip values from Textract output and persist them.
-//
-// Requirements:
-// - Expand normalizeTextractResponse to parse lines/blocks and return gross_pay, net_pay, paye, usc_ni, pension_ee, pension_er (numbers).
-// - Update process_batch to use these parsed values when inserting payslips (instead of nulls).
-// - Handle missing/invalid numbers gracefully (leave null but log a warning).
-// - Keep raw_ocr_json storing the full normalized payload for reference.
-//
-// Definition of Done:
-// - Sample PDFs populate structured columns in payslips (gross/net/etc.).
-// - Logs show when fields cannot be parsed.
-// - Existing pipeline tests updated; new unit tests for the parsing helper.
-//
-// Tests:
-// - Unit tests for normalizeTextractResponse parsing representative Textract payloads.
-// - Integration test ensuring process_batch writes parsed numbers into payslips.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Structured payslip columns populated from Textract where possible.</li>
-      <li>Graceful handling (null + log) when values cannot be parsed.</li>
-      <li>Tests updated/added to cover parsing logic.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M6.4 – Tests: Pipeline & error handling
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add tests around the pure functions in the pipeline: ensure OCR responses are correctly transformed and errors handled gracefully.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Strengthen tests around pipeline logic.
-//
-// Requirements:
-// - Tests for normalisation: given a mocked OCR response, ensure the resulting payslip object has expected fields filled.
-// - Tests for error cases: invalid OCR response should mark job as failed.
-//
-// Definition of Done:
-// - Tests added for normalisation and error handling.
-// - All tests passing locally and in CI.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Normalisation tests added.</li>
-      <li>Error handling behaviour tested.</li>
-    </ul>
-  </details>
-
-  <h2> START HEREMilestone 7 – Comparison & Rules Engine</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M7.1 – Implement diff calculation between payslips
-      <span class="done-label">(comparison logic)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement pure functions to calculate differences between current and previous payslips for an employee, used by the rules engine.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement diff calculation for key payslip fields.
-//
-// Requirements:
-// - A pure function: calculateDiff(previousPayslip, currentPayslip) -> diff object with field changes and percentage changes.
-// - Fields: gross_pay, net_pay, paye, usc_or_ni, pension_employee, pension_employer, ytd_*.
-//
-// Definition of Done:
-// - Function exists and is exported from a logic module.
-// - No DB or Supabase access in this function (pure computation).
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Diff logic module created with type-safe function.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests for calculateDiff with known previous/current values and expected diffs.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M7.2 – Implement rules engine for anomalies (MVP rules)
-      <span class="done-label">(rule evaluation)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Build a simple rules engine that takes a payslip, previous payslip, and diff, and emits a list of issues (rule_code, severity, description).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement MVP rules engine.
-//
-// Before you start:
-// - Confirm list of MVP rules in architecture.md.
-//
-// Requirements:
-// - A pure function: runRules(currentPayslip, previousPayslip, diff) -> IssueCandidate[].
-// - Rules: large net/gross change, tax spike without gross change, YTD regressions, PRSI/NI category change, pension % higher than threshold.
-// - Severity and descriptions should be generated consistently using rule_code mapping.
-//
-// Definition of Done:
-// - runRules implemented in a pure logic module.
-// - No DB access in this function.
-// - Ready to be called from the pipeline to create issues rows.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Rules engine implemented for MVP rules.</li>
-      <li>Rule codes and severity mapping defined in one place.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests verifying each rule triggers under the right conditions and not under normal conditions.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M7.3 – Integrate rules engine into pipeline (create issues)
-      <span class="done-label">(issues creation)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Call the rules engine in the processing pipeline, and insert resulting issues into the <code>issues</code> table linked to payslips, employees, and batches.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Wire the rules engine into the processing pipeline.
-//
-// Requirements:
-// - After inserting a payslip row, fetch the previous payslip (if any) for that employee and client.
-// - Call calculateDiff + runRules.
-// - Insert issues rows for each returned IssueCandidate.
-//
-// Definition of Done:
-// - For a test batch with controlled data, provides issues rows in the DB.
-// - No crashes when no previous payslip exists (rules should handle first period case).
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Issues created after payslip processing for applicable cases.</li>
-      <li>Graceful behaviour when no previous payslip exists.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Integration-style tests with mocked DB/previous payslip fetching.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M7.4 – Tests: Rules integration correctness
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add tests to ensure that the pipeline + rules engine create the expected issues for contrived sample data.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests verifying end-to-end rule behaviour.
-//
-// Requirements:
-// - Construct synthetic previous/current payslip pairs and expect certain issues when rules run.
-// - Mock DB interactions as needed.
-//
-// Definition of Done:
-// - Tests capturing at least one case per rule from M7.2.
-// - Full test suite passes.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>End-to-end rule coverage via tests established.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 8 – Review UI (Dashboard, Batch & Employee Views)</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M8.1 – Dashboard: show clients + latest batch issue summary
-      <span class="done-label">(overview UI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Build the main dashboard showing all clients and, for each, their latest payroll batch and a summary of issues (counts by severity).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement the main Dashboard page.
-//
-// Before you start:
-// - See design.md Dashboard section.
-//
-// Requirements:
-// - Dashboard shows a table or cards of clients with: name, latest batch period, counts of critical/warning/info issues.
-// - Clicking a client navigates to Client detail.
-//
-// Definition of Done:
-// - With sample data, dashboard clearly surfaces where attention is needed.
-// - Layout matches the general design direction.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Dashboard integrated into navigation and shows summary correctly.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests verifying that given mocked data, the dashboard displays correct counts and links.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M8.2 – Batch detail view: summary & employees table
-      <span class="done-label">(batch review UI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement the batch review page with summary cards and a table listing employees with issues for the selected batch.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement Batch detail UI.
-//
-// Requirements:
-// - Show batch metadata (period, status, created_at).
-// - Summary cards: employees processed, critical issues, warnings.
-// - Table listing employees with number and types of issues and an action to "View".
-//
-// Definition of Done:
-// - Navigating to a batch shows correct summary and employees table.
-// - "View" action navigates to Employee view or opens drawer.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Batch detail view implemented and wired to data.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Tests for correct rendering of summary metrics from mocked data.</li>
-      <li>Tests for employee table behaviour.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M8.3 – Employee view: comparison + issues + resolve/note actions
-      <span class="done-label">(employee-level review)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Build the employee payslip comparison view showing current vs previous summary fields, associated issues, and allowing resolution/notes.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement Employee-level review UI.
-//
-// Before you start:
-// - See design.md's Employee Payslip Comparison section.
-//
-// Requirements:
-// - Show key fields for current and previous periods plus diff (net, gross, tax, pension, etc.).
-// - List issues with severity tags and descriptions.
-// - "Mark as resolved" toggles issue.resolved and allows optional note.
-//
-// Definition of Done:
-// - For a sample employee, the view shows correct values and diffs.
-// - Resolved issues visually differ from unresolved ones.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Employee comparison view implemented.</li>
-      <li>Issue resolution actions persist to DB.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests: issue list display, resolve button updates UI via mock handler.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M8.4 – Tests: Review UI flows
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add tests that cover the basic review flows: navigating from dashboard to client to batch to employee, using mocked data.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests simulating key review flows.
-//
-// Requirements:
-// - Test that clicking a client from the dashboard leads to client detail.
-// - Test that clicking a batch leads to batch detail.
-// - Test that clicking an employee leads to employee view.
-//
-// Definition of Done:
-// - Flow tests added using mocked router and data.
-// - All tests pass.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Core navigation flows have test coverage.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 9 – Reporting & Export</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M9.1 – Backend: Batch issues export (CSV)
-      <span class="done-label">(CSV export)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Implement logic to export all issues for a given batch as a CSV file for download.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Implement CSV export for batch issues.
-//
-// Requirements:
-// - Edge Function or API endpoint: getBatchIssuesCsv(batch_id).
-// - Generates CSV with columns: employee, rule_code, severity, description, values (if useful).
-//
-// Definition of Done:
-// - Calling endpoint returns a valid CSV for a batch with issues.
-// - CSV is downloadable from the frontend.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>CSV export endpoint exists and returns valid data.</li>
-      <li>Works with sample batch in Supabase.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Unit tests for CSV generation logic (pure function).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M9.2 – Frontend: Export buttons (CSV/printable report)
-      <span class="done-label">(report UI)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add export controls on the batch detail page to download CSV and view/print a simple HTML report formatted for clients.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add export buttons to the Batch detail UI.
-//
-// Requirements:
-// - Buttons: "Download CSV", "View Report" (or "Print Report").
-// - Download CSV calls the backend endpoint from M9.1.
-// - "View Report" renders a printable HTML view summarising issues.
-//
-// Definition of Done:
-// - Export controls appear on batch detail page.
-// - CSV downloads successfully for batches with issues.
-// - Report view renders key summary information and can be printed.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Buttons integrated in Batch view and functional.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests: clicking export triggers appropriate handlers (mocked).</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M9.3 – Tests: Export correctness
-      <span class="done-label">(TDD checkpoint)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Add tests for export logic to ensure CSV and report data contain expected values and that edge cases (no issues) are handled.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Add tests for export features.
-//
-// Requirements:
-// - CSV tests: given mocked issues, generated CSV should include expected rows.
-// - Report view tests: for empty issues, shows "No issues found" messaging.
-//
-// Definition of Done:
-// - Tests added for both CSV generation and report rendering edge cases.
-// - Full test suite passes.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Export features covered by tests.</li>
-    </ul>
-  </details>
-
-  <h2>Milestone 10 – Hardening, QA & MVP Readiness</h2>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M10.1 – Error states, loading states, and empty states in UI
-      <span class="done-label">(UX resilience)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Polish the UI to handle loading, error, and empty states gracefully across core screens (Dashboard, Clients, Batches, Employee view).
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Improve UX for loading/error/empty states.
-//
-// Requirements:
-// - Use Ant Design `Spin`, `Alert`, and `Empty` components appropriately.
-// - Handle cases where there are no clients, no batches, no issues.
-// - Display user-friendly messages for errors on data fetches.
-//
-// Definition of Done:
-// - No core screen shows raw "undefined" or blank when data is loading or empty.
-// - Manual testing for edge cases passes.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>User-friendly UX for all major states implemented.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Component tests for empty and loading states for at least Dashboard and Batch views.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M10.2 – Security & RLS double-check
-      <span class="done-label">(security review)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Review security posture and RLS, ensuring no cross-organisation data leakage and correct use of Supabase anon keys and service keys.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Perform a security pass focusing on multi-tenancy and secrets.
-//
-// Requirements:
-// - Verify all data access in code uses organisation_id filters or relies on RLS.
-// - Ensure no secret keys (service key) exposed to the frontend.
-// - Review Supabase policies and test with two orgs/users.
-//
-// Definition of Done:
-// - Manual tests confirm users cannot access other orgs' data.
-// - No secrets in client bundle.
-// - Findings (if any) logged and remediated.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>Security assumptions validated.</li>
-      <li>RLS policies confirmed to be correct in practice.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Manual tests + (optional) automated tests for org scoping.</li>
-    </ul>
-  </details>
-
-  <details>
-    <summary>
-      <input type="checkbox" /> M10.3 – Full regression test run & bugfixes
-      <span class="done-label">(MVP sign-off)</span>
-    </summary>
-    <h4>Description</h4>
-    <p>
-      Run the full test suite and perform manual testing of the complete flow (create organisation, add client, upload batch, see issues, export report). Fix any critical issues discovered.
-    </p>
-
-    <h4>Prompt for Cursor</h4>
-    <pre><code>// Goal: Execute full regression and fix any critical bugs.
-//
-// Requirements:
-// - Run `npm test` and ensure green.
-// - Manual E2E scenarios: from signup -> organisation -> client -> batch -> upload -> processing -> review -> export.
-// - Record and fix any critical issues.
-//
-// Definition of Done:
-// - All tests pass.
-// - Core E2E flows work without errors.
-// - Roadmap items for MVP are all checked.
-    </code></pre>
-
-    <h4>Definition of Done</h4>
-    <ul>
-      <li>All existing tests passing locally and in CI.</li>
-      <li>Manual E2E flows succeed.</li>
-      <li>Any critical issues discovered are fixed or logged as follow-up post-MVP tasks.</li>
-    </ul>
-
-    <h4>Tests</h4>
-    <ul>
-      <li>Full test suite run, no regressions.</li>
-    </ul>
   </details>
 
 </body>

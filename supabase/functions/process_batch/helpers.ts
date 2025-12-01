@@ -15,6 +15,7 @@ export type NormalizedTextractResult = {
   usc_ni: number | null;
   pension_ee: number | null;
   pension_er: number | null;
+  prsi_category: string | null;
 };
 
 const NUMERIC_FIELDS = [
@@ -94,10 +95,24 @@ export const normalizeTextractResponse = (
     }
   );
 
+  const prsiCategory = findPrsiCategory(lines);
+
   return {
     raw_text: lines.join("\n"),
+    prsi_category: prsiCategory,
     ...parsedValues,
   };
+};
+
+const findPrsiCategory = (lines: string[]) => {
+  const pattern = /(prsi|ni)\s+(?:class|category)\s*([a-z0-9]+)/i;
+  for (const line of lines) {
+    const match = line.match(pattern);
+    if (match?.[2]) {
+      return match[2].toUpperCase();
+    }
+  }
+  return null;
 };
 
 export const ensureNormalizedHasContent = (
@@ -161,6 +176,7 @@ export const buildPayslipInsert = (
   usc_or_ni: normalized.usc_ni,
   pension_employee: normalized.pension_ee,
   pension_employer: normalized.pension_er,
+  prsi_or_ni_category: normalized.prsi_category,
   raw_ocr_json: normalized,
   storage_path: job.storage_path,
 });

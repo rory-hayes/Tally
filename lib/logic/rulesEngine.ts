@@ -57,6 +57,7 @@ export const runRules = (
         ruleCode: rule.code,
         severity: result.severity ?? rule.severity,
         description: result.description ?? rule.descriptionTemplate,
+        data: result.data,
       });
     });
   });

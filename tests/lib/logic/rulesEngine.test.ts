@@ -68,6 +68,20 @@ describe("runRules", () => {
     expect(issues.map((i) => i.ruleCode)).toContain("TAX_SPIKE_WITHOUT_GROSS");
   });
 
+  it("attaches structured data to tax spike issues", () => {
+    const current = { ...baseCurrent, paye: 900 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, defaultOptions);
+    const taxIssue = issues.find((issue) => issue.ruleCode === "TAX_SPIKE_WITHOUT_GROSS");
+    expect(taxIssue?.data).toMatchObject({
+      field: "paye",
+      previousValue: 600,
+      currentValue: 900,
+      difference: 300,
+      percentChange: expect.any(Number),
+    });
+  });
+
   it("detects YTD regression", () => {
     const current = { ...baseCurrent, ytd_gross: 14000 };
     const diff = calculateDiff(basePrevious, current);

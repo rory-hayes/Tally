@@ -40,6 +40,14 @@ const sampleComparison = {
       rule_code: "NET_CHANGE_LARGE",
       severity: "warning",
       description: "Net pay increased significantly",
+      data: {
+        field: "paye",
+        previousValue: 600,
+        currentValue: 750,
+        difference: 150,
+        percentChange: 25,
+        grossPercentChange: 2,
+      },
       resolved: false,
       note: null,
       resolved_at: null,
@@ -50,6 +58,7 @@ const sampleComparison = {
       rule_code: "USC_SPIKE_WITHOUT_GROSS",
       severity: "warning",
       description: "USC spiked",
+      data: null,
       resolved: true,
       note: null,
       resolved_at: "2025-03-01T10:00:00.000Z",
@@ -60,6 +69,7 @@ const sampleComparison = {
       rule_code: "ocr_ingest",
       severity: "info",
       description: "OCR ingestion captured 1024 characters",
+      data: null,
       resolved: false,
       note: null,
       resolved_at: null,
@@ -116,6 +126,13 @@ describe("EmployeeDetailView", () => {
     const resolved = screen.getByText(/usc spiked/i).closest("span");
     expect(resolved).toHaveClass("ant-typography-secondary");
     expect(resolved?.getAttribute("data-resolved-info")).toMatch(/Resolved by you on/);
+  });
+
+  it("shows structured issue data when provided", () => {
+    render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
+    expect(screen.getAllByText("€600.00").length).toBeGreaterThan(0);
+    expect(screen.getByText("+€150.00")).toBeInTheDocument();
+    expect(screen.getAllByText("25.0%").length).toBeGreaterThan(0);
   });
 
   it("displays info-level issues", () => {

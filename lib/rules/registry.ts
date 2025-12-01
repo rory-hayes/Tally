@@ -62,10 +62,25 @@ const describePensionPercent = (
 
 const applyIssue = (
   description: string,
-  severity?: IssueSeverity
+  severity?: IssueSeverity,
+  data?: Record<string, unknown>
 ): RuleEvaluationOutcome => ({
   description,
   severity,
+  data,
+});
+
+const buildSpikeData = (
+  field: "paye" | "usc_or_ni",
+  entry: DiffEntry,
+  grossPercent: number | null
+) => ({
+  field,
+  previousValue: entry.previous ?? null,
+  currentValue: entry.current ?? null,
+  difference: entry.delta ?? null,
+  percentChange: entry.percentChange ?? null,
+  grossPercentChange: grossPercent,
 });
 
 const baseRuleDefinitions: RuleDefinition[] = [
@@ -121,7 +136,9 @@ const baseRuleDefinitions: RuleDefinition[] = [
         return null;
       }
       return applyIssue(
-        `PAYE increased by ${formatPercent(entry.percentChange)} while gross pay stayed flat`
+        `PAYE increased by ${formatPercent(entry.percentChange)} while gross pay stayed flat`,
+        undefined,
+        buildSpikeData("paye", entry, grossPercent)
       );
     },
   },
@@ -143,7 +160,9 @@ const baseRuleDefinitions: RuleDefinition[] = [
         return null;
       }
       return applyIssue(
-        describeUscSpike(entry.percentChange, entry.previous, entry.current, grossPercent)
+        describeUscSpike(entry.percentChange, entry.previous, entry.current, grossPercent),
+        undefined,
+        buildSpikeData("usc_or_ni", entry, grossPercent)
       );
     },
   },

@@ -32,6 +32,7 @@ export type IssueInsertRow = {
   rule_code: RuleCode;
   severity: IssueSeverity;
   description: string;
+  data: Record<string, unknown> | null;
   note: null;
 };
 
@@ -74,6 +75,7 @@ export const buildIssuesForPayslip = (
     rule_code: issue.ruleCode,
     severity: issue.severity,
     description: issue.description,
+    data: issue.data ?? null,
     note: null,
   }));
 };

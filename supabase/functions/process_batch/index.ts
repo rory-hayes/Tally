@@ -283,6 +283,7 @@ async function insertInfoIssue(
     rule_code: "ocr_ingest",
     severity: "info",
     description: `OCR ingestion captured ${normalized.raw_text.length} characters`,
+    data: null,
     note: null,
   });
 }

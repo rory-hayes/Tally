@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
@@ -38,6 +38,89 @@ const severityColor: Record<IssueSeverity, string> = {
   critical: "red",
   warning: "orange",
   info: "blue",
+};
+
+const issueDataLabels: Record<string, string> = {
+  field: "Field",
+  previousValue: "Previous",
+  currentValue: "Current",
+  difference: "Difference",
+  percentChange: "% change",
+  grossPercentChange: "Gross % change",
+  expectedTax: "Expected tax",
+  actualTax: "Actual tax",
+  rateUsed: "Rate used",
+  bandInfo: "Band",
+};
+
+const currencyDataKeys = new Set([
+  "previousValue",
+  "currentValue",
+  "difference",
+  "expectedTax",
+  "actualTax",
+]);
+const percentDataKeys = new Set(["percentChange", "grossPercentChange", "rateUsed"]);
+
+const formatIssueDataValue = (key: string, value: unknown) => {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  if (typeof value === "number") {
+    if (percentDataKeys.has(key)) {
+      return `${value.toFixed(1)}%`;
+    }
+    if (currencyDataKeys.has(key)) {
+      const absolute = Math.abs(value).toFixed(2);
+      if (key === "difference" && value !== 0) {
+        return `${value >= 0 ? "+" : "-"}€${absolute}`;
+      }
+      return `€${value.toFixed(2)}`;
+    }
+    return value.toFixed(2);
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const renderIssueDataDetails = (data?: Record<string, unknown> | null): ReactNode => {
+  if (!data) {
+    return null;
+  }
+
+  const orderedKeys = Object.keys(issueDataLabels).filter(
+    (key) => data[key] !== undefined && data[key] !== null
+  );
+  const extraEntries = Object.entries(data).filter(([key]) => !(key in issueDataLabels));
+
+  if (!orderedKeys.length && !extraEntries.length) {
+    return null;
+  }
+
+  return (
+    <Space orientation="vertical" size="small" style={{ width: "100%" }}>
+      {orderedKeys.length ? (
+        <Descriptions size="small" column={1} colon>
+          {orderedKeys.map((key) => (
+            <Descriptions.Item key={key} label={issueDataLabels[key]}>
+              {formatIssueDataValue(key, data[key])}
+            </Descriptions.Item>
+          ))}
+        </Descriptions>
+      ) : null}
+      {extraEntries.length ? (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {extraEntries.map(([key, value]) => `${key}: ${formatIssueDataValue(key, value)}`).join(" • ")}
+        </Typography.Text>
+      ) : null}
+    </Space>
+  );
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -280,11 +363,21 @@ const buildResolvedTooltip = (issue: IssueRow, profileId: string | null) => {
                     return content;
                   })()
                 }
-                description={
-                  issue.note ? (
+                description={(() => {
+                  const noteNode = issue.note ? (
                     <Typography.Text type="secondary">Note: {issue.note}</Typography.Text>
-                  ) : null
-                }
+                  ) : null;
+                  const dataNode = renderIssueDataDetails(issue.data);
+                  if (!noteNode && !dataNode) {
+                    return null;
+                  }
+                  return (
+                    <Space orientation="vertical" size="small">
+                      {noteNode}
+                      {dataNode}
+                    </Space>
+                  );
+                })()}
               />
             </List.Item>
           )}

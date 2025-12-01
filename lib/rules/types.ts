@@ -12,11 +12,13 @@ export type RuleCode =
   | "PENSION_EMPLOYEE_HIGH"
   | "PENSION_EMPLOYER_HIGH";
 
+export type IssueDataPayload = Record<string, unknown>;
+
 export type IssueCandidate = {
   ruleCode: RuleCode;
   severity: IssueSeverity;
   description: string;
-  metadata?: Record<string, unknown>;
+  data?: IssueDataPayload;
 };
 
 export type CountryCode = "IE" | "UK" | string;
@@ -33,6 +35,7 @@ export type RuleEvaluationContext = {
 export type RuleEvaluationOutcome = {
   description?: string;
   severity?: IssueSeverity;
+  data?: IssueDataPayload;
 };
 
 export type RuleEvaluationResult =

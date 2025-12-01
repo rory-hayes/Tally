@@ -9,6 +9,7 @@ export type IssueRow = {
   rule_code: string;
   severity: IssueSeverity;
   description: string;
+  data: Record<string, unknown> | null;
   resolved: boolean;
   note: string | null;
   resolved_at: string | null;
@@ -146,6 +147,7 @@ export async function fetchEmployeeComparison(args: {
         rule_code,
         severity,
         description,
+        data,
         resolved,
         note,
         resolved_at,

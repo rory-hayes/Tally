@@ -50,6 +50,17 @@ describe("buildIssuesForPayslip", () => {
     expect(issues.map((issue) => issue.rule_code)).toContain("TAX_SPIKE_WITHOUT_GROSS");
   });
 
+  it("includes structured data payloads for tax spikes", () => {
+    const issues = capture({ paye: 900 }, { paye: 600, gross_pay: 3000 });
+    const taxIssue = issues.find((issue) => issue.rule_code === "TAX_SPIKE_WITHOUT_GROSS");
+    expect(taxIssue?.data).toMatchObject({
+      field: "paye",
+      previousValue: 600,
+      currentValue: 900,
+      difference: 300,
+    });
+  });
+
   it("surfaces YTD regressions", () => {
     const issues = capture({ ytd_net: 10000 }, { ytd_net: 12000 });
     expect(issues.map((issue) => issue.rule_code)).toContain("YTD_REGRESSION");

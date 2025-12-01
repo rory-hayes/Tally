@@ -204,10 +204,11 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   ];
 
   const createdAt = new Date(batch.created_at).toLocaleString();
-  const processingSummary =
-    typeof batch.processed_files === "number" && typeof batch.total_files === "number"
-      ? `${batch.processed_files}/${batch.total_files} files processed`
-      : null;
+  const hasValidFileTotals =
+    typeof batch.processed_files === "number" && typeof batch.total_files === "number";
+  const processedLabel = hasValidFileTotals
+    ? `${batch.processed_files}/${batch.total_files} files processed`
+    : null;
   const hasActiveJobs = data.jobs.pending + data.jobs.processing > 0;
   const hasFailedJobs = data.jobs.failedJobs.length > 0;
 
@@ -238,11 +239,16 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Created: {createdAt}
         </Typography.Paragraph>
-        {processingSummary && (
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {processingSummary}
-          </Typography.Paragraph>
-        )}
+          {processedLabel && (
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              <span data-testid="batch-file-progress">{processedLabel}</span>
+              {hasFailedJobs && (
+                <Tag color="red" style={{ marginLeft: 8 }} data-testid="batch-failed-count-tag">
+                  {data.jobs.failed} failed
+                </Tag>
+              )}
+            </Typography.Paragraph>
+          )}
         {hasFailedJobs && (
           <Alert
             type="error"

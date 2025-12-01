@@ -230,7 +230,7 @@ describe("BatchDetailView", () => {
       });
 
     render(<BatchDetailView batchId="batch-1" />);
-    expect(screen.getByText(/1\/3 files processed/i)).toBeInTheDocument();
+    expect(screen.getByTestId("batch-file-progress")).toHaveTextContent("1/3 files processed");
     expect(screen.getByText(/processing in progress/i)).toBeInTheDocument();
   });
 
@@ -256,6 +256,7 @@ describe("BatchDetailView", () => {
     render(<BatchDetailView batchId="batch-1" />);
     expect(screen.getByText(/failed during processing/i)).toBeInTheDocument();
     expect(screen.getByText(/EMP003.pdf/i)).toBeInTheDocument();
+    expect(screen.getByTestId("batch-failed-count-tag")).toHaveTextContent("1 failed");
   });
 
   it("refreshes when tab becomes visible", () => {

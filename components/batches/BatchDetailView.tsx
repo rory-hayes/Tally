@@ -41,6 +41,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
 
   const batch = data?.batch ?? null;
@@ -50,21 +51,21 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       multiple: true,
       accept: ".pdf,.PDF",
       fileList,
+      showUploadList: true,
       onRemove: (file: UploadFile) => {
         setFileList((prev) => prev.filter((item) => item.uid !== file.uid));
       },
-      onChange: (info: { fileList: UploadFile[] }) => {
-        setFileList(info.fileList);
-      },
       beforeUpload: (file: RcFile) => {
-        const uploadFile: UploadFile = {
-          uid: file.uid,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          originFileObj: file,
-        };
-        setFileList((prev) => [...prev, uploadFile]);
+        setFileList((prev) => [
+          ...prev,
+          {
+            uid: file.uid,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            originFileObj: file,
+          },
+        ]);
         return false;
       },
     }),
@@ -94,7 +95,8 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         total_files: (batch.total_files ?? 0) + files.length,
       });
       await invokeCreateProcessingJobs(batch.id);
-      message.success("Files uploaded and queued for processing.");
+      message.success(`${files.length} file(s) uploaded and queued for processing.`);
+      setProcessingMessage("Processing new files… this may take a minute.");
       setFileList([]);
       await refresh();
     } catch (err) {
@@ -178,6 +180,10 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   ];
 
   const createdAt = new Date(batch.created_at).toLocaleString();
+  const processingSummary =
+    typeof batch.processed_files === "number" && typeof batch.total_files === "number"
+      ? `${batch.processed_files}/${batch.total_files} files processed`
+      : null;
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
@@ -206,6 +212,16 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Created: {createdAt}
         </Typography.Paragraph>
+        {processingSummary && (
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            {processingSummary}
+          </Typography.Paragraph>
+        )}
+        {processingMessage && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
+            {processingMessage}
+          </Typography.Paragraph>
+        )}
       </Card>
 
       <Space orientation="horizontal" size="large" wrap>
@@ -225,6 +241,12 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
           <Typography.Text type="secondary">Warnings</Typography.Text>
           <Typography.Title level={3} style={{ color: severityColors.warning }}>
             {data.totals.warning}
+          </Typography.Title>
+        </Card>
+        <Card style={{ minWidth: 200 }}>
+          <Typography.Text type="secondary">Info issues</Typography.Text>
+          <Typography.Title level={3} style={{ color: severityColors.info }}>
+            {data.totals.info}
           </Typography.Title>
         </Card>
       </Space>
@@ -248,6 +270,11 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
           <p className="ant-upload-text">
             Upload payslip PDFs for this batch. Files are stored securely.
           </p>
+          {fileList.length === 0 && (
+            <Typography.Text type="secondary">
+              Select one or more PDF files to enable upload.
+            </Typography.Text>
+          )}
         </Upload.Dragger>
         <Space>
           <Button onClick={() => setFileList([])} disabled={fileList.length === 0 || uploading}>
@@ -259,7 +286,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             loading={uploading}
             disabled={uploading || fileList.length === 0}
           >
-            Upload files
+            {uploading ? "Uploading…" : "Upload files"}
           </Button>
         </Space>
       </Card>

@@ -143,18 +143,40 @@ describe("BatchDetailView", () => {
 
   it("renders Empty state when no employees", () => {
     mockUseBatchDetail.mockReturnValue({
-      status: "success",
-      data: {
-        ...sampleDetail,
-        employees: [],
-        totals: { employeesProcessed: 0, critical: 0, warning: 0, info: 0 },
-      },
-      error: null,
-      refresh: vi.fn(),
+        status: "success",
+        data: {
+          ...sampleDetail,
+          employees: [],
+          totals: { employeesProcessed: 0, critical: 0, warning: 0, info: 0 },
+        },
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      render(<BatchDetailView batchId="batch-1" />);
+      expect(screen.getByText(/No employees processed yet/i)).toBeInTheDocument();
     });
 
-    render(<BatchDetailView batchId="batch-1" />);
-    expect(screen.getByText(/No employees processed yet/i)).toBeInTheDocument();
-  });
+    it("disables upload button when no files selected", () => {
+      render(<BatchDetailView batchId="batch-1" />);
+      const uploadButton = screen.getByRole("button", { name: /upload files/i });
+      expect(uploadButton).toBeDisabled();
+    });
+
+    it("shows processing summary text when provided", () => {
+      const detailWithProgress = {
+        ...sampleDetail,
+        batch: { ...sampleDetail.batch, processed_files: 1, total_files: 3 },
+      };
+      mockUseBatchDetail.mockReturnValue({
+        status: "success",
+        data: detailWithProgress,
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      render(<BatchDetailView batchId="batch-1" />);
+      expect(screen.getByText(/1\/3 files processed/i)).toBeInTheDocument();
+    });
 });
 

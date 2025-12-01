@@ -18,7 +18,7 @@ type ClientWithRelations = ClientRow & {
 };
 
 type IssueRow = {
-  client_id: string;
+  client_id: string | null;
   severity: IssueSeverity;
 };
 

@@ -15,6 +15,10 @@ export type NormalizedTextractResult = {
   usc_ni: number | null;
   pension_ee: number | null;
   pension_er: number | null;
+  ytd_gross: number | null;
+  ytd_net: number | null;
+  ytd_tax: number | null;
+  ytd_usc_or_ni: number | null;
   prsi_category: string | null;
   pay_date: string | null;
 };
@@ -26,6 +30,10 @@ const NUMERIC_FIELDS = [
   "usc_ni",
   "pension_ee",
   "pension_er",
+  "ytd_gross",
+  "ytd_net",
+  "ytd_tax",
+  "ytd_usc_or_ni",
 ] as const;
 type NumericField = (typeof NUMERIC_FIELDS)[number];
 
@@ -44,6 +52,22 @@ const FIELD_PATTERNS: Record<NumericField, RegExp[]> = {
   pension_er: [
     /pension\s*\(employer\)\s*[:\s-]+([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
     /employer\s+pension[:\s-]+([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+  ],
+  ytd_gross: [
+    /(year(?:-|\s*)to(?:-|\s*)date|ytd)\s*(?:gross|total\s+gross)[^\d]*([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+    /gross\s*(?:ytd|year(?:-|\s*)to(?:-|\s*)date)\s*[:\s-]+([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+  ],
+  ytd_net: [
+    /(year(?:-|\s*)to(?:-|\s*)date|ytd)\s*(?:net\s+pay|net)[^\d]*([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+    /net\s*(?:ytd|year(?:-|\s*)to(?:-|\s*)date)\s*[:\s-]+([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+  ],
+  ytd_tax: [
+    /(year(?:-|\s*)to(?:-|\s*)date|ytd)\s*(?:paye|tax)[^\d]*([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+    /(paye|tax)\s*(?:ytd|year(?:-|\s*)to(?:-|\s*)date)\s*[:\s-]+([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+  ],
+  ytd_usc_or_ni: [
+    /(year(?:-|\s*)to(?:-|\s*)date|ytd)\s*(?:usc|usc\/?ni|ni)[^\d]*([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
+    /(usc|usc\/?ni|ni)\s*(?:ytd|year(?:-|\s*)to(?:-|\s*)date)\s*[:\s-]+([$\u00a3\u20ac]?\s*[\d,]+(?:\.\d+)?)/i,
   ],
 };
 
@@ -93,6 +117,10 @@ export const normalizeTextractResponse = (
       usc_ni: null,
       pension_ee: null,
       pension_er: null,
+      ytd_gross: null,
+      ytd_net: null,
+      ytd_tax: null,
+      ytd_usc_or_ni: null,
     }
   );
 
@@ -290,6 +318,10 @@ export const buildPayslipInsert = (
   usc_or_ni: normalized.usc_ni,
   pension_employee: normalized.pension_ee,
   pension_employer: normalized.pension_er,
+  ytd_gross: normalized.ytd_gross,
+  ytd_net: normalized.ytd_net,
+  ytd_tax: normalized.ytd_tax,
+  ytd_usc_or_ni: normalized.ytd_usc_or_ni,
   prsi_or_ni_category: normalized.prsi_category,
   raw_ocr_json: normalized,
   storage_path: job.storage_path,

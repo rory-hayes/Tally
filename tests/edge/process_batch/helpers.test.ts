@@ -18,6 +18,10 @@ const sampleResponse = {
     { BlockType: "LINE", Text: "Pension (Employee): 150.00" },
     { BlockType: "LINE", Text: "Pension (Employer): 180.00" },
     { BlockType: "LINE", Text: "Net Pay: 2,115.00" },
+    { BlockType: "LINE", Text: "YTD Gross: 25,000.00" },
+    { BlockType: "LINE", Text: "YTD Net Pay: 18,750.00" },
+    { BlockType: "LINE", Text: "YTD PAYE: 4,200.00" },
+    { BlockType: "LINE", Text: "YTD USC: 1,050.00" },
   ],
 };
 
@@ -36,6 +40,10 @@ describe("normalizeTextractResponse", () => {
     expect(normalized.pension_er).toBe(180);
     expect(normalized.prsi_category).toBe("A1");
     expect(normalized.pay_date).toBe("2025-01-31");
+    expect(normalized.ytd_gross).toBe(25000);
+    expect(normalized.ytd_net).toBe(18750);
+    expect(normalized.ytd_tax).toBe(4200);
+    expect(normalized.ytd_usc_or_ni).toBe(1050);
     expect(normalized.raw_text).toContain("Gross Pay");
   });
 
@@ -48,6 +56,10 @@ describe("normalizeTextractResponse", () => {
       "usc_ni",
       "pension_ee",
       "pension_er",
+      "ytd_gross",
+      "ytd_net",
+      "ytd_tax",
+      "ytd_usc_or_ni",
     ]);
   });
 });
@@ -76,6 +88,10 @@ describe("buildPayslipInsert", () => {
       usc_or_ni: 135.5,
       pension_employee: 150,
       pension_employer: 180,
+      ytd_gross: 25000,
+      ytd_net: 18750,
+      ytd_tax: 4200,
+      ytd_usc_or_ni: 1050,
       storage_path: job.storage_path,
       prsi_or_ni_category: "A1",
     });

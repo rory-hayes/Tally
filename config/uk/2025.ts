@@ -27,6 +27,7 @@ export const uk2025Config: UkTaxYearConfig = {
       primaryThresholdWeekly: 242,
       secondaryThresholdWeekly: 175,
       upperEarningsLimitWeekly: 967,
+      upperSecondaryThresholdWeekly: 967,
       freePortUpperWeekly: 481,
     },
     rates: {
@@ -34,6 +35,25 @@ export const uk2025Config: UkTaxYearConfig = {
       employeeUpperRate: 0.02,
       employerRate: 0.138,
       employerFreePortRate: 0.00,
+    },
+    categories: {
+      A: { code: "A", description: "Standard category" },
+      C: { code: "C", description: "State pension age employee", employeeLowerRateOverride: 0, employeeUpperRateOverride: 0 },
+      H: {
+        code: "H",
+        description: "Apprentice under 25",
+        employerRateBelowUpperSecondary: 0,
+      },
+      M: {
+        code: "M",
+        description: "Under 21",
+        employerRateBelowUpperSecondary: 0,
+      },
+      Z: {
+        code: "Z",
+        description: "Under 21 deferment",
+        employerRateBelowUpperSecondary: 0,
+      },
     },
   },
   studentLoans: [

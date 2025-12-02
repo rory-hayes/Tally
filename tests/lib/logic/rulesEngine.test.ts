@@ -10,6 +10,7 @@ import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi } from "@/lib/rules/iePrsi";
 import { calcUkPaye } from "@/lib/rules/ukPaye";
+import { calcUkNic } from "@/lib/rules/ukNic";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -306,6 +307,50 @@ describe("runRules", () => {
       ukContext: { paye: { taxCode: "1257L", payFrequency: "monthly" } },
     });
     expect(issues.map((i) => i.ruleCode)).not.toContain("UK_PAYE_MISMATCH");
+  });
+
+  it("flags UK NIC mismatch when recalculation differs", () => {
+    const ukConfig = getDefaultRuleConfig("UK", 2025);
+    const current = { ...baseCurrent, gross_pay: 800, nic_employee: 0, nic_employer: 0 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: ukConfig,
+      ukContext: { nic: { categoryLetter: "A", payFrequency: "weekly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).toContain("UK_NIC_MISMATCH");
+  });
+
+  it("does not flag UK NIC mismatch when within tolerance", () => {
+    const ukConfig = getDefaultRuleConfig("UK", 2025);
+    const expectedNic = calcUkNic(800, ukConfig.ukConfig!, "A", "weekly");
+    const current = {
+      ...baseCurrent,
+      gross_pay: 800,
+      nic_employee: expectedNic.employeeCharge,
+      nic_employer: expectedNic.employerCharge,
+    };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: ukConfig,
+      ukContext: { nic: { categoryLetter: "A", payFrequency: "weekly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).not.toContain("UK_NIC_MISMATCH");
+  });
+
+  it("flags unusual NIC categories based on profile", () => {
+    const current = { ...baseCurrent, prsi_or_ni_category: "A", gross_pay: 500 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: getDefaultRuleConfig("UK", 2025),
+      ukContext: { nic: { age: 19, isApprentice: true, payFrequency: "weekly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).toContain("UK_NIC_CATEGORY_UNUSUAL");
   });
 
   it("consumes newly registered rules without engine changes", () => {

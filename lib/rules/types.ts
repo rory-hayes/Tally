@@ -19,7 +19,9 @@ export type RuleCode =
   | "IE_USC_MISMATCH"
   | "IE_PRSI_MISMATCH"
   | "IE_PRSI_CLASS_UNUSUAL"
-  | "UK_PAYE_MISMATCH";
+  | "UK_PAYE_MISMATCH"
+  | "UK_NIC_MISMATCH"
+  | "UK_NIC_CATEGORY_UNUSUAL";
 
 export type IssueDataPayload = Record<string, unknown>;
 
@@ -80,5 +82,13 @@ export type UkRuleContext = {
   paye?: {
     taxCode?: string | null;
     payFrequency?: PayFrequency | null;
+  };
+  nic?: {
+    categoryLetter?: string | null;
+    payFrequency?: PayFrequency | null;
+    age?: number | null;
+    isApprentice?: boolean;
+    isPensioner?: boolean;
+    expectedCategory?: string | null;
   };
 };

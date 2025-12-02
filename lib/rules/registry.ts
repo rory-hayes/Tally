@@ -3,6 +3,7 @@ import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi, normalizePrsiClass, deriveWeeklyEarnings } from "@/lib/rules/iePrsi";
 import { calcUkPaye } from "@/lib/rules/ukPaye";
+import { calcUkNic, normalizeNicCategory } from "@/lib/rules/ukNic";
 import type {
   CountryCode,
   IssueSeverity,
@@ -29,6 +30,7 @@ const IE_PAYE_MISMATCH_TOLERANCE = 1; // €1 tolerance for rounding
 const IE_USC_MISMATCH_TOLERANCE = 1;
 const IE_PRSI_MISMATCH_TOLERANCE = 1;
 const UK_PAYE_MISMATCH_TOLERANCE = 1;
+const UK_NIC_MISMATCH_TOLERANCE = 1;
 
 const formatAmount = (value: number | null | undefined) =>
   typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
@@ -485,6 +487,93 @@ const baseRuleDefinitions: RuleDefinition[] = [
         expectedClass: expectedClass ?? null,
         weeklyEarnings: Number(weeklyEarnings.toFixed(2)),
         lowPayThreshold,
+      });
+    },
+  },
+  {
+    code: "UK_NIC_MISMATCH",
+    descriptionTemplate: "NIC does not match recalculated amount",
+    severity: "warning",
+    categories: ["tax", "compliance"],
+    appliesTo: { countries: ["UK"] },
+    evaluate: ({ current, config, ukContext }) => {
+      if (!config.ukConfig) return null;
+      const actualEmployee = isNumber(current.nic_employee) ? current.nic_employee : null;
+      const actualEmployer = isNumber(current.nic_employer) ? current.nic_employer : null;
+      if (actualEmployee === null && actualEmployer === null) return null;
+
+      const category =
+        normalizeNicCategory(current.prsi_or_ni_category) ??
+        normalizeNicCategory(ukContext?.nic?.categoryLetter) ??
+        "A";
+      const payFrequency = ukContext?.nic?.payFrequency ?? ukContext?.paye?.payFrequency ?? null;
+      const calc = calcUkNic(current.gross_pay, config.ukConfig, category, payFrequency);
+
+      const employeeDelta =
+        actualEmployee === null ? 0 : Number((calc.employeeCharge - actualEmployee).toFixed(2));
+      const employerDelta =
+        actualEmployer === null ? 0 : Number((calc.employerCharge - actualEmployer).toFixed(2));
+
+      const employeeMismatch =
+        actualEmployee !== null && Math.abs(employeeDelta) > UK_NIC_MISMATCH_TOLERANCE;
+      const employerMismatch =
+        actualEmployer !== null && Math.abs(employerDelta) > UK_NIC_MISMATCH_TOLERANCE;
+
+      if (!employeeMismatch && !employerMismatch) return null;
+
+      const formatNumber = (value: number | null) => (value === null ? null : Number(value.toFixed(2)));
+      const description = `NIC for category ${calc.category} differs from expected`;
+
+      return applyIssue(description, "warning", {
+        category: calc.category,
+        weeklyEarnings: formatNumber(calc.weeklyEarnings),
+        expectedEmployee: formatNumber(calc.employeeCharge),
+        actualEmployee: formatNumber(actualEmployee),
+        employeeDifference: formatNumber(employeeDelta),
+        expectedEmployer: formatNumber(calc.employerCharge),
+        actualEmployer: formatNumber(actualEmployer),
+        employerDifference: formatNumber(employerDelta),
+      });
+    },
+  },
+  {
+    code: "UK_NIC_CATEGORY_UNUSUAL",
+    descriptionTemplate: "NIC category looks unusual for this profile",
+    severity: "warning",
+    categories: ["compliance"],
+    appliesTo: { countries: ["UK"] },
+    evaluate: ({ current, config, ukContext }) => {
+      if (!config.ukConfig) return null;
+      const payslipCategory = normalizeNicCategory(current.prsi_or_ni_category);
+      const expectedCategory = normalizeNicCategory(ukContext?.nic?.expectedCategory);
+      const age = ukContext?.nic?.age ?? null;
+      const isPensioner = ukContext?.nic?.isPensioner ?? false;
+      const isApprentice = ukContext?.nic?.isApprentice ?? false;
+
+      const reasons: string[] = [];
+      if (!payslipCategory) {
+        reasons.push("NIC category missing on payslip");
+      }
+      if (expectedCategory && payslipCategory && expectedCategory !== payslipCategory) {
+        reasons.push(`Expected NIC category ${expectedCategory} but payslip shows ${payslipCategory}`);
+      }
+      if ((isPensioner || (age !== null && age >= 66)) && payslipCategory && payslipCategory !== "C") {
+        reasons.push("Pension-age employee should normally use category C");
+      }
+      if (age !== null && age < 21 && payslipCategory && !["M", "Z"].includes(payslipCategory)) {
+        reasons.push("Under 21 employee usually uses category M or Z");
+      }
+      if (isApprentice && age !== null && age < 25 && payslipCategory && payslipCategory !== "H") {
+        reasons.push("Apprentice under 25 usually uses category H");
+      }
+
+      if (!reasons.length) return null;
+      return applyIssue(reasons[0], "warning", {
+        categoryOnPayslip: payslipCategory ?? null,
+        expectedCategory: expectedCategory ?? null,
+        age,
+        isPensioner,
+        isApprentice,
       });
     },
   },

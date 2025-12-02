@@ -196,6 +196,8 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
     | `IE_PRSI_MISMATCH` | warning | Recomputed PRSI EE/ER contributions differ from payslip |
     | `IE_PRSI_CLASS_UNUSUAL` | warning | Payslip PRSI class inconsistent with profile |
     | `UK_PAYE_MISMATCH` | warning | Recomputed PAYE (using UK tax code & config) differs from payslip |
+    | `UK_NIC_MISMATCH` | warning | Recomputed NIC (EE/ER) differs from payslip |
+    | `UK_NIC_CATEGORY_UNUSUAL` | warning | NIC category letter inconsistent with profile |
 
 - **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.
 

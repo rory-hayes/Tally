@@ -5,6 +5,8 @@ const NUMERIC_FIELDS = [
   "usc_or_ni",
   "prsi_employee",
   "prsi_employer",
+  "nic_employee",
+  "nic_employer",
   "pension_employee",
   "pension_employer",
   "ytd_gross",

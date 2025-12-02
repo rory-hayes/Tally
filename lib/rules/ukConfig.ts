@@ -10,6 +10,7 @@ export type UkNicThresholds = {
   primaryThresholdWeekly: number;
   secondaryThresholdWeekly: number;
   upperEarningsLimitWeekly: number;
+  upperSecondaryThresholdWeekly?: number;
   freePortUpperWeekly?: number;
 };
 
@@ -18,6 +19,15 @@ export type UkNicRates = {
   employeeUpperRate: number; // above UEL
   employerRate: number;
   employerFreePortRate?: number;
+};
+
+export type UkNicCategoryConfig = {
+  code: string;
+  description?: string;
+  employeeLowerRateOverride?: number;
+  employeeUpperRateOverride?: number;
+  employerRateOverride?: number;
+  employerRateBelowUpperSecondary?: number;
 };
 
 export type UkStudentLoanThreshold = {
@@ -36,6 +46,7 @@ export type UkTaxYearConfig = {
   nic: {
     thresholds: UkNicThresholds;
     rates: UkNicRates;
+    categories: Record<string, UkNicCategoryConfig>;
   };
   studentLoans: UkStudentLoanThreshold[];
 };

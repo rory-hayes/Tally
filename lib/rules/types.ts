@@ -1,5 +1,6 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
 import type { IeTaxYearConfig } from "@/lib/rules/ieConfig";
+import type { IePrsiProfile } from "@/lib/rules/iePrsi";
 
 export type IssueSeverity = "info" | "warning" | "critical";
 
@@ -13,7 +14,9 @@ export type RuleCode =
   | "PENSION_EMPLOYEE_HIGH"
   | "PENSION_EMPLOYER_HIGH"
   | "IE_PAYE_MISMATCH"
-  | "IE_USC_MISMATCH";
+  | "IE_USC_MISMATCH"
+  | "IE_PRSI_MISMATCH"
+  | "IE_PRSI_CLASS_UNUSUAL";
 
 export type IssueDataPayload = Record<string, unknown>;
 
@@ -65,5 +68,5 @@ export type IeRuleContext = {
     standardRateCutoff: number;
     taxCredits: number;
   };
+  prsi?: IePrsiProfile | null;
 };
-

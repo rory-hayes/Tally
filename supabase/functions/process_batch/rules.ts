@@ -8,6 +8,7 @@ import {
 import type {
   CountryCode,
   RuleConfig,
+  IeRuleContext,
 } from "../../../lib/rules/types.ts";
 
 export const PAYSLIP_SELECT_FIELDS =
@@ -42,6 +43,7 @@ type BuildIssuesOptions = {
   country?: CountryCode | null;
   taxYear?: number | null;
   config?: RuleConfig;
+  ieContext?: IeRuleContext | null;
 };
 
 export const buildIssuesForPayslip = (
@@ -64,6 +66,7 @@ export const buildIssuesForPayslip = (
     country,
     taxYear: taxYear ?? undefined,
     config: options?.config,
+    ieContext: options?.ieContext ?? null,
   });
 
   return issues.map((issue) => ({
@@ -79,4 +82,3 @@ export const buildIssuesForPayslip = (
     note: null,
   }));
 };
-

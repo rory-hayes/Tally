@@ -8,6 +8,7 @@ import {
 import { getDefaultRuleConfig } from "@/lib/rules/config";
 import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
+import { calcIePrsi } from "@/lib/rules/iePrsi";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -222,6 +223,63 @@ describe("runRules", () => {
     expect(issues.map((i) => i.ruleCode)).not.toContain("IE_USC_MISMATCH");
   });
 
+  it("flags IE PRSI mismatch when recalculated contributions differ", () => {
+    const current = {
+      ...baseCurrent,
+      gross_pay: 1000,
+      prsi_employee: 5,
+      prsi_employer: 15,
+    };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, defaultOptions);
+    const mismatch = issues.find((issue) => issue.ruleCode === "IE_PRSI_MISMATCH");
+    expect(mismatch).toBeTruthy();
+    expect(mismatch?.data).toMatchObject({
+      classCode: "A",
+      expectedEmployee: expect.any(Number),
+      expectedEmployer: expect.any(Number),
+    });
+  });
+
+  it("does not flag PRSI mismatch when amounts align within tolerance", () => {
+    const current = {
+      ...baseCurrent,
+      gross_pay: 1000,
+      prsi_or_ni_category: "A1",
+    };
+    const calc = calcIePrsi(current, baselineIeConfig, { expectedClass: "A" })!;
+    const aligned = {
+      ...current,
+      prsi_employee: calc.employeeCharge,
+      prsi_employer: calc.employerCharge,
+    };
+    const diff = calculateDiff(basePrevious, aligned);
+    const issues = runRules(aligned, basePrevious, diff, defaultOptions);
+    expect(issues.map((i) => i.ruleCode)).not.toContain("IE_PRSI_MISMATCH");
+  });
+
+  it("flags unusual PRSI classes for pensioners and low pay profiles", () => {
+    const current = { ...baseCurrent, prsi_or_ni_category: "A1", gross_pay: 300 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      ...defaultOptions,
+      ieContext: { prsi: { isPensioner: true, expectedClass: "J", lowPayRole: true } },
+    });
+    const issue = issues.find((i) => i.ruleCode === "IE_PRSI_CLASS_UNUSUAL");
+    expect(issue).toBeTruthy();
+    expect(issue?.description).toMatch(/Pensioner|PRSI class/i);
+  });
+
+  it("allows expected PRSI class without raising unusual issue", () => {
+    const current = { ...baseCurrent, prsi_or_ni_category: "J1", gross_pay: 300 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      ...defaultOptions,
+      ieContext: { prsi: { isPensioner: true, expectedClass: "J", lowPayRole: true } },
+    });
+    expect(issues.map((i) => i.ruleCode)).not.toContain("IE_PRSI_CLASS_UNUSUAL");
+  });
+
   it("consumes newly registered rules without engine changes", () => {
     const customRule: RuleDefinition = {
       code: "PRSI_CATEGORY_CHANGE",
@@ -245,4 +303,3 @@ describe("runRules", () => {
     __dangerousSetRuleDefinitionsForTesting(); // reset after test
   });
 });
-

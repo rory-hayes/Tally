@@ -3,6 +3,8 @@ const NUMERIC_FIELDS = [
   "net_pay",
   "paye",
   "usc_or_ni",
+  "prsi_employee",
+  "prsi_employer",
   "pension_employee",
   "pension_employer",
   "ytd_gross",
@@ -75,4 +77,3 @@ export const calculateDiff = (
     return acc;
   }, {} as PayslipDiff);
 };
-

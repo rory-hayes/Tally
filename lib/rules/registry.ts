@@ -1,6 +1,7 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
 import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
+import { calcIePrsi, normalizePrsiClass, deriveWeeklyEarnings } from "@/lib/rules/iePrsi";
 import type {
   CountryCode,
   IssueSeverity,
@@ -25,6 +26,7 @@ export type RuleDefinition = {
 const COUNTRY_ALL: CountryCode[] = ["IE", "UK"];
 const IE_PAYE_MISMATCH_TOLERANCE = 1; // €1 tolerance for rounding
 const IE_USC_MISMATCH_TOLERANCE = 1;
+const IE_PRSI_MISMATCH_TOLERANCE = 1;
 
 const formatAmount = (value: number | null | undefined) =>
   typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
@@ -38,6 +40,9 @@ const formatSignedPercent = (value: number | null | undefined) =>
 type DiffEntry = PayslipDiff[keyof PayslipDiff];
 
 const hasPreviousData = (entry: DiffEntry | undefined) => typeof entry?.previous === "number";
+
+const isNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
 
 const describeUscSpike = (
   uscPercent: number | null,
@@ -331,6 +336,116 @@ const baseRuleDefinitions: RuleDefinition[] = [
       );
     },
   },
+  {
+    code: "IE_PRSI_MISMATCH",
+    descriptionTemplate: "PRSI does not match recalculated amount",
+    severity: "warning",
+    categories: ["tax", "compliance"],
+    appliesTo: { countries: ["IE"] },
+    evaluate: ({ current, config, ieContext }) => {
+      if (!config.ieConfig) return null;
+      const actualEmployee = isNumber(current.prsi_employee) ? current.prsi_employee : null;
+      const actualEmployer = isNumber(current.prsi_employer) ? current.prsi_employer : null;
+      if (actualEmployee === null && actualEmployer === null) return null;
+
+      const calc = calcIePrsi(current, config.ieConfig, ieContext?.prsi);
+      if (!calc) return null;
+
+      const employeeDelta =
+        actualEmployee === null ? 0 : Number((calc.employeeCharge - actualEmployee).toFixed(2));
+      const employerDelta =
+        actualEmployer === null ? 0 : Number((calc.employerCharge - actualEmployer).toFixed(2));
+
+      const employeeMismatch =
+        actualEmployee !== null && Math.abs(employeeDelta) > IE_PRSI_MISMATCH_TOLERANCE;
+      const employerMismatch =
+        actualEmployer !== null && Math.abs(employerDelta) > IE_PRSI_MISMATCH_TOLERANCE;
+
+      if (!employeeMismatch && !employerMismatch) return null;
+
+      const formatNumber = (value: number | null) =>
+        value === null ? null : Number(value.toFixed(2));
+      const parts = [];
+      if (employeeMismatch) {
+        parts.push(
+          `EE expected ${formatAmount(calc.employeeCharge)} vs ${formatAmount(actualEmployee)}`
+        );
+      }
+      if (employerMismatch) {
+        parts.push(
+          `ER expected ${formatAmount(calc.employerCharge)} vs ${formatAmount(actualEmployer)}`
+        );
+      }
+      const description = `PRSI class ${calc.classCode} differs: ${parts.join("; ")}`;
+
+      return applyIssue(description, "warning", {
+        classCode: calc.classCode,
+        weeklyEarnings: formatNumber(calc.weeklyEarnings),
+        subjectEarnings: formatNumber(calc.subjectEarnings),
+        expectedEmployee: formatNumber(calc.employeeCharge),
+        actualEmployee: formatNumber(actualEmployee),
+        employeeDifference: formatNumber(employeeDelta),
+        expectedEmployer: formatNumber(calc.employerCharge),
+        actualEmployer: formatNumber(actualEmployer),
+        employerDifference: formatNumber(employerDelta),
+        creditApplied: formatNumber(calc.employeeCredit),
+      });
+    },
+  },
+  {
+    code: "IE_PRSI_CLASS_UNUSUAL",
+    descriptionTemplate: "PRSI class looks unusual for this profile",
+    severity: "warning",
+    categories: ["compliance"],
+    appliesTo: { countries: ["IE"] },
+    evaluate: ({ current, config, ieContext }) => {
+      if (!config.ieConfig) return null;
+      const profile = ieContext?.prsi;
+      const classOnPayslip = normalizePrsiClass(current.prsi_or_ni_category);
+      const expectedClass = normalizePrsiClass(profile?.expectedClass);
+
+      const reasons: string[] = [];
+      const isPensioner =
+        !!profile?.isPensioner || (typeof profile?.age === "number" && profile.age >= 66);
+      if (!classOnPayslip) {
+        reasons.push("PRSI class missing or unrecognised on payslip");
+      }
+      if (expectedClass && classOnPayslip && expectedClass !== classOnPayslip) {
+        reasons.push(`Expected PRSI class ${expectedClass} but payslip shows ${classOnPayslip}`);
+      }
+      if (isPensioner && classOnPayslip && classOnPayslip !== "J") {
+        reasons.push("Pensioner with non-J PRSI class");
+      }
+      if (profile?.isSelfEmployed && classOnPayslip && classOnPayslip !== "S") {
+        reasons.push("Self-employed profile but PRSI class is not S");
+      }
+
+      const weeklyEarnings = deriveWeeklyEarnings(
+        current.gross_pay,
+        profile?.payFrequency,
+        profile?.weeklyEarningsOverride
+      );
+      const lowPayThreshold = config.ieConfig.prsi.classes.A?.weeklyThreshold ?? null;
+      if (
+        profile?.lowPayRole &&
+        lowPayThreshold !== null &&
+        weeklyEarnings < lowPayThreshold &&
+        classOnPayslip &&
+        classOnPayslip !== "J"
+      ) {
+        reasons.push("Low-pay role under class A threshold but PRSI class is not J");
+      }
+
+      if (!reasons.length) return null;
+
+      return applyIssue(reasons[0], "warning", {
+        classOnPayslip: classOnPayslip ?? null,
+        expectedClass: expectedClass ?? null,
+        weeklyEarnings: Number(weeklyEarnings.toFixed(2)),
+        lowPayThreshold,
+      });
+    },
+  },
 ];
 
 let activeDefinitions = [...baseRuleDefinitions];
@@ -360,4 +475,3 @@ export const __dangerousSetRuleDefinitionsForTesting = (definitions?: RuleDefini
 };
 
 export const __getAllRuleDefinitions = () => [...activeDefinitions];
-

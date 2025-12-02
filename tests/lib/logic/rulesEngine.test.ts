@@ -9,6 +9,7 @@ import { getDefaultRuleConfig } from "@/lib/rules/config";
 import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi } from "@/lib/rules/iePrsi";
+import { calcUkPaye } from "@/lib/rules/ukPaye";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -278,6 +279,33 @@ describe("runRules", () => {
       ieContext: { prsi: { isPensioner: true, expectedClass: "J", lowPayRole: true } },
     });
     expect(issues.map((i) => i.ruleCode)).not.toContain("IE_PRSI_CLASS_UNUSUAL");
+  });
+
+  it("flags UK PAYE mismatch when recalculation differs", () => {
+    const ukConfig = getDefaultRuleConfig("UK", 2025);
+    const current = { ...baseCurrent, gross_pay: 3000, paye: 200 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: ukConfig,
+      ukContext: { paye: { taxCode: "1257L", payFrequency: "monthly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).toContain("UK_PAYE_MISMATCH");
+  });
+
+  it("does not flag UK PAYE mismatch when within tolerance", () => {
+    const ukConfig = getDefaultRuleConfig("UK", 2025);
+    const expected = calcUkPaye(3000, ukConfig.ukConfig!, "1257L", "monthly");
+    const current = { ...baseCurrent, gross_pay: 3000, paye: expected.taxDue };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: ukConfig,
+      ukContext: { paye: { taxCode: "1257L", payFrequency: "monthly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).not.toContain("UK_PAYE_MISMATCH");
   });
 
   it("consumes newly registered rules without engine changes", () => {

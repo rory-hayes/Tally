@@ -2,6 +2,7 @@ import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
 import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi, normalizePrsiClass, deriveWeeklyEarnings } from "@/lib/rules/iePrsi";
+import { calcUkPaye } from "@/lib/rules/ukPaye";
 import type {
   CountryCode,
   IssueSeverity,
@@ -27,6 +28,7 @@ const COUNTRY_ALL: CountryCode[] = ["IE", "UK"];
 const IE_PAYE_MISMATCH_TOLERANCE = 1; // €1 tolerance for rounding
 const IE_USC_MISMATCH_TOLERANCE = 1;
 const IE_PRSI_MISMATCH_TOLERANCE = 1;
+const UK_PAYE_MISMATCH_TOLERANCE = 1;
 
 const formatAmount = (value: number | null | undefined) =>
   typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
@@ -332,6 +334,46 @@ const baseRuleDefinitions: RuleDefinition[] = [
             charge: formatNumber(band.charge),
             upperLimit: band.upperLimit,
           })),
+        }
+      );
+    },
+  },
+  {
+    code: "UK_PAYE_MISMATCH",
+    descriptionTemplate: "PAYE does not match recalculated amount",
+    severity: "warning",
+    categories: ["tax", "compliance"],
+    appliesTo: { countries: ["UK"] },
+    evaluate: ({ current, config, ukContext }) => {
+      if (!config.ukConfig) return null;
+      const taxCode = ukContext?.paye?.taxCode ?? null;
+      const payFrequency = ukContext?.paye?.payFrequency ?? null;
+      if (!taxCode || !payFrequency) return null;
+      const actualPaye =
+        typeof current.paye === "number" && Number.isFinite(current.paye) ? current.paye : null;
+      if (actualPaye === null) return null;
+      const grossPay =
+        typeof current.gross_pay === "number" && Number.isFinite(current.gross_pay)
+          ? current.gross_pay
+          : null;
+
+      const calc = calcUkPaye(grossPay, config.ukConfig, taxCode, payFrequency);
+      const delta = calc.taxDue - actualPaye;
+      if (Math.abs(delta) <= UK_PAYE_MISMATCH_TOLERANCE) {
+        return null;
+      }
+      const formatNumber = (value: number) => Number(value.toFixed(2));
+      return applyIssue(
+        `PAYE expected ${formatAmount(calc.taxDue)} for tax code ${taxCode} but payslip shows ${formatAmount(
+          actualPaye
+        )}`,
+        "warning",
+        {
+          expectedTax: formatNumber(calc.taxDue),
+          actualTax: formatNumber(actualPaye),
+          difference: formatNumber(delta),
+          taxCodeUsed: taxCode,
+          allowanceUsed: formatNumber(calc.allowancePerPeriod),
         }
       );
     },

@@ -1,6 +1,7 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
 import type { IeTaxYearConfig } from "@/lib/rules/ieConfig";
 import type { UkTaxYearConfig } from "@/lib/rules/ukConfig";
+import type { PayFrequency } from "@/lib/rules/iePrsi";
 import type { IePrsiProfile } from "@/lib/rules/iePrsi";
 
 export type IssueSeverity = "info" | "warning" | "critical";
@@ -17,7 +18,8 @@ export type RuleCode =
   | "IE_PAYE_MISMATCH"
   | "IE_USC_MISMATCH"
   | "IE_PRSI_MISMATCH"
-  | "IE_PRSI_CLASS_UNUSUAL";
+  | "IE_PRSI_CLASS_UNUSUAL"
+  | "UK_PAYE_MISMATCH";
 
 export type IssueDataPayload = Record<string, unknown>;
 
@@ -38,6 +40,7 @@ export type RuleEvaluationContext = {
   taxYear: number | null;
   config: RuleConfig;
   ieContext?: IeRuleContext | null;
+  ukContext?: UkRuleContext | null;
 };
 
 export type RuleEvaluationOutcome = {
@@ -71,4 +74,11 @@ export type IeRuleContext = {
     taxCredits: number;
   };
   prsi?: IePrsiProfile | null;
+};
+
+export type UkRuleContext = {
+  paye?: {
+    taxCode?: string | null;
+    payFrequency?: PayFrequency | null;
+  };
 };

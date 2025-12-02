@@ -9,6 +9,7 @@ import type {
   CountryCode,
   RuleConfig,
   IeRuleContext,
+  UkRuleContext,
 } from "../../../lib/rules/types.ts";
 
 export const PAYSLIP_SELECT_FIELDS =
@@ -44,6 +45,7 @@ type BuildIssuesOptions = {
   taxYear?: number | null;
   config?: RuleConfig;
   ieContext?: IeRuleContext | null;
+  ukContext?: UkRuleContext | null;
 };
 
 export const buildIssuesForPayslip = (
@@ -67,6 +69,7 @@ export const buildIssuesForPayslip = (
     taxYear: taxYear ?? undefined,
     config: options?.config,
     ieContext: options?.ieContext ?? null,
+    ukContext: options?.ukContext ?? null,
   });
 
   return issues.map((issue) => ({

@@ -1,3 +1,5 @@
+import { uk2025Config } from "@/config/uk/2025";
+
 export type UkPayeBand = {
   label: string;
   rate: number;
@@ -59,4 +61,3 @@ export const getUkConfigForYear = (taxYear?: number | null): UkTaxYearConfig => 
 
 // Register bundled configs
 registerUkConfig(uk2025Config);
-import { uk2025Config } from "@/config/uk/2025";

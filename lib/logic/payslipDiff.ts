@@ -7,6 +7,8 @@ const NUMERIC_FIELDS = [
   "prsi_employer",
   "nic_employee",
   "nic_employer",
+  "student_loan",
+  "postgrad_loan",
   "pension_employee",
   "pension_employer",
   "ytd_gross",

@@ -21,7 +21,8 @@ export type RuleCode =
   | "IE_PRSI_CLASS_UNUSUAL"
   | "UK_PAYE_MISMATCH"
   | "UK_NIC_MISMATCH"
-  | "UK_NIC_CATEGORY_UNUSUAL";
+  | "UK_NIC_CATEGORY_UNUSUAL"
+  | "UK_STUDENT_LOAN_MISMATCH";
 
 export type IssueDataPayload = Record<string, unknown>;
 
@@ -90,5 +91,10 @@ export type UkRuleContext = {
     isApprentice?: boolean;
     isPensioner?: boolean;
     expectedCategory?: string | null;
+  };
+  studentLoans?: {
+    planType?: "Plan1" | "Plan2" | "Plan4" | "Plan5" | null;
+    hasPostgradLoan?: boolean;
+    payFrequency?: PayFrequency | null;
   };
 };

@@ -11,6 +11,7 @@ import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi } from "@/lib/rules/iePrsi";
 import { calcUkPaye } from "@/lib/rules/ukPaye";
 import { calcUkNic } from "@/lib/rules/ukNic";
+import { calcUkStudentLoan } from "@/lib/rules/ukStudentLoan";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -351,6 +352,38 @@ describe("runRules", () => {
       ukContext: { nic: { age: 19, isApprentice: true, payFrequency: "weekly" } },
     });
     expect(issues.map((i) => i.ruleCode)).toContain("UK_NIC_CATEGORY_UNUSUAL");
+  });
+
+  it("flags UK student loan mismatch when recalculated differs", () => {
+    const ukConfig = getDefaultRuleConfig("UK", 2025);
+    const current = { ...baseCurrent, gross_pay: 4000, student_loan: 0, postgrad_loan: 0 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: ukConfig,
+      ukContext: { studentLoans: { planType: "Plan2", hasPostgradLoan: false, payFrequency: "monthly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).toContain("UK_STUDENT_LOAN_MISMATCH");
+  });
+
+  it("does not flag UK student loan mismatch when amounts align", () => {
+    const ukConfig = getDefaultRuleConfig("UK", 2025);
+    const expected = calcUkStudentLoan(4000, ukConfig.ukConfig!, "Plan2", true, "monthly");
+    const current = {
+      ...baseCurrent,
+      gross_pay: 4000,
+      student_loan: expected.planCharge,
+      postgrad_loan: expected.postgradCharge,
+    };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, {
+      country: "UK",
+      taxYear: 2025,
+      config: ukConfig,
+      ukContext: { studentLoans: { planType: "Plan2", hasPostgradLoan: true, payFrequency: "monthly" } },
+    });
+    expect(issues.map((i) => i.ruleCode)).not.toContain("UK_STUDENT_LOAN_MISMATCH");
   });
 
   it("consumes newly registered rules without engine changes", () => {

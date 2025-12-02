@@ -4,6 +4,7 @@ import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi, normalizePrsiClass, deriveWeeklyEarnings } from "@/lib/rules/iePrsi";
 import { calcUkPaye } from "@/lib/rules/ukPaye";
 import { calcUkNic, normalizeNicCategory } from "@/lib/rules/ukNic";
+import { calcUkStudentLoan } from "@/lib/rules/ukStudentLoan";
 import type {
   CountryCode,
   IssueSeverity,
@@ -31,6 +32,7 @@ const IE_USC_MISMATCH_TOLERANCE = 1;
 const IE_PRSI_MISMATCH_TOLERANCE = 1;
 const UK_PAYE_MISMATCH_TOLERANCE = 1;
 const UK_NIC_MISMATCH_TOLERANCE = 1;
+const UK_STUDENT_LOAN_MISMATCH_TOLERANCE = 1;
 
 const formatAmount = (value: number | null | undefined) =>
   typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
@@ -574,6 +576,55 @@ const baseRuleDefinitions: RuleDefinition[] = [
         age,
         isPensioner,
         isApprentice,
+      });
+    },
+  },
+  {
+    code: "UK_STUDENT_LOAN_MISMATCH",
+    descriptionTemplate: "Student loan deduction does not match expected amount",
+    severity: "warning",
+    categories: ["tax", "compliance"],
+    appliesTo: { countries: ["UK"] },
+    evaluate: ({ current, config, ukContext }) => {
+      if (!config.ukConfig) return null;
+      const actualPlan =
+        typeof current.student_loan === "number" && Number.isFinite(current.student_loan)
+          ? current.student_loan
+          : null;
+      const actualPostgrad =
+        typeof current.postgrad_loan === "number" && Number.isFinite(current.postgrad_loan)
+          ? current.postgrad_loan
+          : null;
+      if (actualPlan === null && actualPostgrad === null) return null;
+
+      const planType = ukContext?.studentLoans?.planType ?? null;
+      const hasPostgrad = ukContext?.studentLoans?.hasPostgradLoan ?? false;
+      const payFrequency = ukContext?.studentLoans?.payFrequency ?? ukContext?.paye?.payFrequency ?? null;
+      const calc = calcUkStudentLoan(current.gross_pay, config.ukConfig, planType, hasPostgrad, payFrequency);
+
+      const planDelta = actualPlan === null ? 0 : Number((calc.planCharge - actualPlan).toFixed(2));
+      const postgradDelta =
+        actualPostgrad === null ? 0 : Number((calc.postgradCharge - actualPostgrad).toFixed(2));
+
+      const planMismatch =
+        actualPlan !== null && Math.abs(planDelta) > UK_STUDENT_LOAN_MISMATCH_TOLERANCE;
+      const postgradMismatch =
+        actualPostgrad !== null && Math.abs(postgradDelta) > UK_STUDENT_LOAN_MISMATCH_TOLERANCE;
+
+      if (!planMismatch && !postgradMismatch) return null;
+
+      const formatNumber = (value: number | null) => (value === null ? null : Number(value.toFixed(2)));
+      return applyIssue("Student loan deductions differ from expected amounts", "warning", {
+        planType: planType ?? null,
+        hasPostgradLoan: hasPostgrad,
+        expectedPlan: formatNumber(calc.planCharge),
+        actualPlan: formatNumber(actualPlan),
+        planDifference: formatNumber(planDelta),
+        expectedPostgrad: formatNumber(calc.postgradCharge),
+        actualPostgrad: formatNumber(actualPostgrad),
+        postgradDifference: formatNumber(postgradDelta),
+        planThresholdPerPeriod: calc.planThresholdPerPeriod,
+        postgradThresholdPerPeriod: calc.postgradThresholdPerPeriod,
       });
     },
   },

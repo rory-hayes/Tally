@@ -12,7 +12,8 @@ export type RuleCode =
   | "PRSI_CATEGORY_CHANGE"
   | "PENSION_EMPLOYEE_HIGH"
   | "PENSION_EMPLOYER_HIGH"
-  | "IE_PAYE_MISMATCH";
+  | "IE_PAYE_MISMATCH"
+  | "IE_USC_MISMATCH";
 
 export type IssueDataPayload = Record<string, unknown>;
 

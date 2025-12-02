@@ -4,6 +4,8 @@ import {
   __dangerousSetRuleDefinitionsForTesting,
   type RuleDefinition,
 } from "@/lib/rules/registry";
+import { getIeConfigForYear } from "@/lib/rules/ieConfig";
+import { calcIeUsc } from "@/lib/rules/ieUsc";
 
 const basePayslip = {
   id: "current",
@@ -14,7 +16,6 @@ const basePayslip = {
   gross_pay: 3000,
   net_pay: 2100,
   paye: 500,
-  usc_or_ni: 120,
   pension_employee: 150,
   pension_employer: 150,
   ytd_gross: 15000,
@@ -23,6 +24,10 @@ const basePayslip = {
   ytd_usc_or_ni: 600,
   prsi_or_ni_category: "A1",
 };
+
+const ieConfig2025 = getIeConfigForYear(2025);
+const baselineUsc = calcIeUsc(basePayslip.gross_pay, ieConfig2025).totalCharge;
+basePayslip.usc_or_ni = baselineUsc;
 
 const capture = (overrides: Partial<typeof basePayslip>, prevOverrides?: Partial<typeof basePayslip>) => {
   const previous = { ...basePayslip, id: "prev", ...prevOverrides };

@@ -1,5 +1,6 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
 import { calcIePaye } from "@/lib/rules/iePaye";
+import { calcIeUsc } from "@/lib/rules/ieUsc";
 import type {
   CountryCode,
   IssueSeverity,
@@ -23,6 +24,7 @@ export type RuleDefinition = {
 
 const COUNTRY_ALL: CountryCode[] = ["IE", "UK"];
 const IE_PAYE_MISMATCH_TOLERANCE = 1; // €1 tolerance for rounding
+const IE_USC_MISMATCH_TOLERANCE = 1;
 
 const formatAmount = (value: number | null | undefined) =>
   typeof value === "number" ? `€${value.toFixed(2)}` : "n/a";
@@ -285,6 +287,46 @@ const baseRuleDefinitions: RuleDefinition[] = [
           standardTax: formatNumber(calc.standardTax),
           higherTax: formatNumber(calc.higherTax),
           creditsApplied: formatNumber(calc.creditsApplied),
+        }
+      );
+    },
+  },
+  {
+    code: "IE_USC_MISMATCH",
+    descriptionTemplate: "USC does not match recalculated amount",
+    severity: "warning",
+    categories: ["tax", "compliance"],
+    appliesTo: { countries: ["IE"] },
+    evaluate: ({ current, config }) => {
+      if (!config.ieConfig) return null;
+      const actualUsc =
+        typeof current.usc_or_ni === "number" && Number.isFinite(current.usc_or_ni)
+          ? current.usc_or_ni
+          : null;
+      if (actualUsc === null) return null;
+      const grossPay =
+        typeof current.gross_pay === "number" && Number.isFinite(current.gross_pay)
+          ? current.gross_pay
+          : null;
+      const calc = calcIeUsc(grossPay, config.ieConfig);
+      const delta = calc.totalCharge - actualUsc;
+      if (Math.abs(delta) <= IE_USC_MISMATCH_TOLERANCE) {
+        return null;
+      }
+      const formatNumber = (value: number) => Number(value.toFixed(2));
+      return applyIssue(
+        `USC expected ${formatAmount(calc.totalCharge)} but payslip shows ${formatAmount(actualUsc)}`,
+        "warning",
+        {
+          expectedUsc: formatNumber(calc.totalCharge),
+          actualUsc: formatNumber(actualUsc),
+          difference: formatNumber(delta),
+          bands: calc.bandUsage.map((band) => ({
+            rate: band.rate,
+            amount: formatNumber(band.amount),
+            charge: formatNumber(band.charge),
+            upperLimit: band.upperLimit,
+          })),
         }
       );
     },

@@ -15,7 +15,8 @@ export type IePayeBreakdown = {
   netTax: number;
 };
 
-const clamp = (value: number, min = 0) => (Number.isFinite(value) ? Math.max(min, value) : 0);
+const clamp = (value: number | null | undefined, min = 0) =>
+  typeof value === "number" && Number.isFinite(value) ? Math.max(min, value) : 0;
 
 export const calcIePaye = (
   gross: number | null | undefined,

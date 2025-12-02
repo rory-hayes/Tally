@@ -7,6 +7,7 @@ import {
 } from "@/lib/rules/registry";
 import { getDefaultRuleConfig } from "@/lib/rules/config";
 import { calcIePaye } from "@/lib/rules/iePaye";
+import { calcIeUsc } from "@/lib/rules/ieUsc";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -32,6 +33,11 @@ const defaultOptions = {
   taxYear: 2025,
   config: getDefaultRuleConfig("IE", 2025),
 };
+
+const baselineIeConfig = defaultOptions.config.ieConfig!;
+const baselineUsc = calcIeUsc(baseCurrent.gross_pay, baselineIeConfig).totalCharge;
+baseCurrent.usc_or_ni = baselineUsc;
+basePrevious.usc_or_ni = baselineUsc;
 
 describe("runRules", () => {
   it("flags large net change", () => {
@@ -197,6 +203,23 @@ describe("runRules", () => {
       ieContext,
     });
     expect(issues.map((i) => i.ruleCode)).not.toContain("IE_PAYE_MISMATCH");
+  });
+
+  it("flags IE USC mismatch when recalculated USC differs", () => {
+    const current = { ...baseCurrent, gross_pay: 80000, usc_or_ni: 500 };
+    const diff = calculateDiff(basePrevious, current);
+    const issues = runRules(current, basePrevious, diff, defaultOptions);
+    expect(issues.map((i) => i.ruleCode)).toContain("IE_USC_MISMATCH");
+  });
+
+  it("does not flag IE USC mismatch when values align", () => {
+    const current = { ...baseCurrent, gross_pay: 20000 };
+    const diff = calculateDiff(basePrevious, current);
+    const ieConfig = defaultOptions.config.ieConfig!;
+    const { totalCharge } = calcIeUsc(current.gross_pay, ieConfig);
+    const aligned = { ...current, usc_or_ni: totalCharge };
+    const issues = runRules(aligned, basePrevious, diff, defaultOptions);
+    expect(issues.map((i) => i.ruleCode)).not.toContain("IE_USC_MISMATCH");
   });
 
   it("consumes newly registered rules without engine changes", () => {

@@ -1,5 +1,6 @@
 import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
 import type { IeTaxYearConfig } from "@/lib/rules/ieConfig";
+import type { UkTaxYearConfig } from "@/lib/rules/ukConfig";
 import type { IePrsiProfile } from "@/lib/rules/iePrsi";
 
 export type IssueSeverity = "info" | "warning" | "critical";
@@ -61,6 +62,7 @@ export type RuleConfig = {
   pensionEmployeePercent: number;
   pensionEmployerPercent: number;
   ieConfig?: IeTaxYearConfig | null;
+  ukConfig?: UkTaxYearConfig | null;
 };
 
 export type IeRuleContext = {

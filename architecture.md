@@ -171,7 +171,7 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
   - `RuleDefinition` objects describing rule metadata (`code`, `severity`, `categories`, `descriptionTemplate`, applicability by `country`/`tax_year`).
   - `getActiveRules(country, taxYear)` which filters the registry for the current payslip context.
 - **Rule configuration**: Thresholds live in `RuleConfig` objects loaded via `lib/rules/config.ts`. Defaults are keyed by country + tax year, while bureau/client overrides are stored in `client_rule_config` (JSONB). The processing pipeline merges overrides with defaults and passes the resulting config into every rule evaluation so thresholds can vary per client without new deployments.
-- **Jurisdiction config**: Country-specific tax data (e.g., IE PAYE/USC/PRSI) lives under `config/<country>/<year>.ts`. Loader utilities (e.g., `getIeConfigForYear`) in `lib/rules/ieConfig.ts` expose typed structures that are attached to `RuleContext.config.ieConfig` whenever the payslip country is IE, so downstream logic can read the official Revenue rates/bands without hard-coding values.
+- **Jurisdiction config**: Country-specific tax data (e.g., IE PAYE/USC/PRSI, UK PAYE/NIC/Student Loans) lives under `config/<country>/<year>.ts`. Loader utilities (e.g., `getIeConfigForYear`, `getUkConfigForYear`) expose typed structures that are attached to `RuleContext.config.ieConfig`/`ukConfig` whenever the payslip country matches, so downstream logic can read official rates/bands without hard-coding values.
 - Each rule definition provides an `evaluate(context)` function (pure) that inspects the current/previous payslip diff and returns zero or more `IssueCandidate`s.
 - `runRules(current, previous, diff, options)` simply fetches the active rule pack and executes each definition. Adding a new rule requires only appending a `RuleDefinition` entry; engine code stays unchanged.
 - Countries / tax years default to `IE` / derived from payslip `pay_date`, but clients can extend coverage by adding new definitions or packs.
@@ -193,6 +193,8 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
     | `PENSION_EMPLOYER_HIGH` | info | Employer pension above threshold |
     | `IE_PAYE_MISMATCH` | warning | Recomputed PAYE differs from payslip beyond tolerance |
     | `IE_USC_MISMATCH` | warning | Recomputed USC differs from payslip beyond tolerance |
+    | `IE_PRSI_MISMATCH` | warning | Recomputed PRSI EE/ER contributions differ from payslip |
+    | `IE_PRSI_CLASS_UNUSUAL` | warning | Payslip PRSI class inconsistent with profile |
 
 - **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.
 

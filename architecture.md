@@ -200,6 +200,7 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
     | `UK_NIC_CATEGORY_UNUSUAL` | warning | NIC category letter inconsistent with profile |
     | `UK_STUDENT_LOAN_MISMATCH` | warning | Student loan / PG loan deductions differ from expected |
 
+- **Payroll register ingestion**: `payroll_register_entries` captures batch-level gross-to-net data per employee and batch totals, uploaded via an Edge Function that accepts CSV and upserts rows by batch/client. A reconciliation helper compares register rows to payslips to emit `REGISTER_PAYSPLIP_TOTAL_MISMATCH`, `MISSING_REGISTER_ENTRY`, and `MISSING_PAYSLIP` findings. Register context is optional so existing rules continue to operate without uploaded registers.
 - **Contract / HR data**: The `contracts` table stores optional employment profile data per employee (`salary_amount`, `salary_period`, `hourly_rate`, `standard_hours_per_week`, effective dates). Repository methods (`getContractForEmployee`, `upsertContract`) expose CRUD for the dashboard. `RuleContext.contractProfile` is optional and ensures existing rules remain stable when no contract data is present, while enabling future contract-compliance checks.
 
 - **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.

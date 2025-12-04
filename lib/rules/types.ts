@@ -22,7 +22,10 @@ export type RuleCode =
   | "UK_PAYE_MISMATCH"
   | "UK_NIC_MISMATCH"
   | "UK_NIC_CATEGORY_UNUSUAL"
-  | "UK_STUDENT_LOAN_MISMATCH";
+  | "UK_STUDENT_LOAN_MISMATCH"
+  | "REGISTER_PAYSPLIP_TOTAL_MISMATCH"
+  | "MISSING_REGISTER_ENTRY"
+  | "MISSING_PAYSLIP";
 
 export type IssueDataPayload = Record<string, unknown>;
 

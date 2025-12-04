@@ -199,6 +199,14 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
     | `UK_NIC_MISMATCH` | warning | Recomputed NIC (EE/ER) differs from payslip |
     | `UK_NIC_CATEGORY_UNUSUAL` | warning | NIC category letter inconsistent with profile |
     | `UK_STUDENT_LOAN_MISMATCH` | warning | Student loan / PG loan deductions differ from expected |
+    | `REGISTER_PAYSPLIP_TOTAL_MISMATCH` | warning | Register totals vs payslip totals differ |
+    | `MISSING_REGISTER_ENTRY` | warning | Register missing entry for payslip employee |
+    | `MISSING_PAYSLIP` | warning | Register has employee without payslip |
+    | `GL_PAYROLL_TOTAL_MISMATCH` | warning | GL wages total differs from payslip gross |
+    | `GL_EMPLOYER_TAX_MISMATCH` | warning | GL employer taxes differ from payslip totals |
+    | `BANK_NETPAY_MISMATCH` | warning | Bank payment amounts differ from payslip net pay |
+    | `BANK_PAYMENT_WITHOUT_PAYSLIP` | warning | Bank payment exists with no matching payslip |
+    | `PAYSLIP_WITHOUT_PAYMENT` | warning | Payslip net pay lacks corresponding bank payment |
 
 - **Payroll register ingestion**: `payroll_register_entries` captures batch-level gross-to-net data per employee and batch totals, uploaded via an Edge Function that accepts CSV and upserts rows by batch/client. A reconciliation helper compares register rows to payslips to emit `REGISTER_PAYSPLIP_TOTAL_MISMATCH`, `MISSING_REGISTER_ENTRY`, and `MISSING_PAYSLIP` findings. Register context is optional so existing rules continue to operate without uploaded registers.
 - **Contract / HR data**: The `contracts` table stores optional employment profile data per employee (`salary_amount`, `salary_period`, `hourly_rate`, `standard_hours_per_week`, effective dates). Repository methods (`getContractForEmployee`, `upsertContract`) expose CRUD for the dashboard. `RuleContext.contractProfile` is optional and ensures existing rules remain stable when no contract data is present, while enabling future contract-compliance checks.

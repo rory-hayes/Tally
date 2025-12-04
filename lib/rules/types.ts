@@ -27,7 +27,10 @@ export type RuleCode =
   | "MISSING_REGISTER_ENTRY"
   | "MISSING_PAYSLIP"
   | "GL_PAYROLL_TOTAL_MISMATCH"
-  | "GL_EMPLOYER_TAX_MISMATCH";
+  | "GL_EMPLOYER_TAX_MISMATCH"
+  | "BANK_NETPAY_MISMATCH"
+  | "BANK_PAYMENT_WITHOUT_PAYSLIP"
+  | "PAYSLIP_WITHOUT_PAYMENT";
 
 export type IssueDataPayload = Record<string, unknown>;
 

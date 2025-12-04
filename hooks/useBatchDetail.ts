@@ -35,9 +35,8 @@ export function useBatchDetail(batchId: string) {
   }, [batchId, organisationId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   return { ...state, refresh: load };
 }
-

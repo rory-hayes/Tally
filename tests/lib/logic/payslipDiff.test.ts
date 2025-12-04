@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateDiff, PayslipDiff } from "@/lib/logic/payslipDiff";
+import { calculateDiff } from "@/lib/logic/payslipDiff";
 
 const basePrevious = {
   gross_pay: 3000,
@@ -94,4 +94,3 @@ describe("calculateDiff", () => {
     );
   });
 });
-

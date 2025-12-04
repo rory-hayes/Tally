@@ -1,4 +1,4 @@
-import type { IssueCandidate, IssueSeverity } from "@/lib/rules/types";
+import type { IssueCandidate } from "@/lib/rules/types";
 import type { PayslipLike } from "@/lib/logic/payslipDiff";
 import type { RegisterEntry } from "@/lib/register/parser";
 
@@ -20,7 +20,7 @@ export const reconcileRegister = (payslips: PayslipLike[], register: RegisterEnt
   });
 
   payslips.forEach((p) => {
-    const employeeId = (p as any).employee_id as string | undefined;
+    const employeeId = p.employee_id ?? p.id ?? undefined;
     if (!employeeId) return;
     const match = registerByEmployee.get(employeeId);
     if (!match) {
@@ -51,7 +51,7 @@ export const reconcileRegister = (payslips: PayslipLike[], register: RegisterEnt
   });
 
   registerByEmployee.forEach((entry, employeeId) => {
-    const hasPayslip = payslips.some((p) => (p as any).employee_id === employeeId);
+    const hasPayslip = payslips.some((p) => p.employee_id === employeeId || p.id === employeeId);
     if (!hasPayslip) {
       issues.push({
         ruleCode: "MISSING_PAYSLIP",

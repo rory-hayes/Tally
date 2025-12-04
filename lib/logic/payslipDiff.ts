@@ -21,6 +21,8 @@ export type PayslipNumericField = (typeof NUMERIC_FIELDS)[number];
 
 export type PayslipLike = Partial<Record<PayslipNumericField, number | null | undefined>> & {
   prsi_or_ni_category?: string | null;
+  employee_id?: string | null;
+  id?: string | null;
 };
 
 export type DiffEntry = {

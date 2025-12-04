@@ -19,10 +19,10 @@ export const reconcilePaymentsToPayslips = (
     paymentsByEmployee.set(p.employee_id, list);
   });
 
-  const payslipsWithIds = payslips.filter((p) => (p as any).employee_id);
+  const payslipsWithIds = payslips.filter((p) => p.employee_id);
 
   payslipsWithIds.forEach((p) => {
-    const employeeId = (p as any).employee_id as string;
+    const employeeId = p.employee_id as string;
     const netPay = p.net_pay ?? 0;
     const paymentsForEmployee = paymentsByEmployee.get(employeeId) ?? [];
     if (!paymentsForEmployee.length) {
@@ -50,7 +50,7 @@ export const reconcilePaymentsToPayslips = (
   });
 
   paymentsByEmployee.forEach((_list, employeeId) => {
-    const hasPayslip = payslipsWithIds.some((p) => (p as any).employee_id === employeeId);
+    const hasPayslip = payslipsWithIds.some((p) => p.employee_id === employeeId);
     if (!hasPayslip) {
       issues.push({
         ruleCode: "BANK_PAYMENT_WITHOUT_PAYSLIP",

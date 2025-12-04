@@ -33,11 +33,15 @@ vi.mock("antd", () => {
   const Button = ({
     children,
     htmlType,
+    block,
+    loading,
     ...rest
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     htmlType?: "button" | "submit";
+    block?: boolean;
+    loading?: boolean;
   }) => (
-    <button type={htmlType} {...rest}>
+    <button type={htmlType} data-block={block} data-loading={loading} {...rest}>
       {children}
     </button>
   );
@@ -146,4 +150,3 @@ describe("CreateOrganisationForm", () => {
     expect(await screen.findByText(/boom/)).toBeInTheDocument();
   });
 });
-

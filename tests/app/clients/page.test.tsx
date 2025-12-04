@@ -11,8 +11,6 @@ const repoMocks = vi.hoisted(() => ({
 
 const mockGetClientsForOrg = repoMocks.getClientsForOrg;
 const mockCreateClient = repoMocks.createClient;
-const mockUpdateClient = repoMocks.updateClient;
-const mockDeleteClient = repoMocks.deleteClient;
 
 const mockRouter = {
   push: vi.fn(),
@@ -183,5 +181,4 @@ describe("ClientsManager workflow", () => {
     expect(mockRouter.push).toHaveBeenCalledWith("/clients/client-7");
   });
 });
-
 

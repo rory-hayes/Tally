@@ -4,8 +4,6 @@ import { getActiveRules } from "@/lib/rules/registry";
 import type {
   CountryCode,
   IssueCandidate,
-  IssueSeverity,
-  RuleCode,
   RuleEvaluationOutcome,
   RuleConfig,
   IeRuleContext,
@@ -22,7 +20,7 @@ export type RuleRuntimeOptions = {
   contractProfile?: ContractProfile | null;
 };
 
-export type { IssueCandidate, IssueSeverity, RuleCode } from "@/lib/rules/types";
+export type { IssueCandidate, RuleCode, IssueSeverity } from "@/lib/rules/types";
 
 const normalizeResult = (
   outcome: RuleEvaluationOutcome | RuleEvaluationOutcome[] | null | undefined

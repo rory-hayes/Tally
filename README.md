@@ -1,59 +1,209 @@
-This repository hosts the Tally MVP frontend built with [Next.js](https://nextjs.org).
+# Tally – Automated Payroll Verification & Reconciliation Platform
 
-## Getting Started
+Tally is a B2B SaaS platform for accounting firms and payroll bureaus in Ireland and the UK.  
+It automates the verification of payroll outputs through OCR extraction, anomaly detection, and reconciliation against previous periods and external payroll artefacts.
 
-Run the development server:
+Tally does **not** compute payroll—it audits it.
 
-```bash
-npm run dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) to see the default page. Edit `app/page.tsx` to start building the UI.
+## 1. Problem
 
-## Supabase Configuration
+Accountants and payroll bureaus manually verify:
 
-Copy `env.example` to `.env.local` (or `.env`) and drop in the publishable credentials for the Tally Supabase project:
+- Payslips  
+- Payroll system reports  
+- GL postings  
+- Bank payment files  
+- Revenue/HMRC submissions  
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://jqixmhtgpabvaqdegvdn.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<sb_publishable_... key>
-# Optional legacy fallback if publishable keys are disabled
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<legacy anon key>
-```
+This is slow, error-prone, unbillable, and risky.  
+Payroll errors cause compliance issues, tax exposure, and unhappy employees.
 
-`lib/supabaseClient.ts` prefers the publishable key (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) but will fall back to the legacy anon key if provided. Both values are safe to expose in the browser. `ClientsPreview` + `useClients` demonstrate querying the `clients` table directly from the dashboard page.
+---
 
-## Testing & CI
+## 2. Solution
 
-Unit and component smoke tests use Vitest + React Testing Library:
+Tally provides a **single automated verification layer** that:
 
-```bash
-npm run test        # one-off run
-npm run test:watch  # watch mode during development
-```
+1. Reads payslips via OCR (AWS Textract)  
+2. Normalises data across payroll systems  
+3. Compares each employee to their prior periods  
+4. Applies jurisdiction-specific rules (IE/UK)  
+5. Reconciles with accounting, payment files, and statutory submissions  
+6. Generates actionable issues  
+7. Produces audit-ready reports  
 
-A GitHub Actions workflow (`.github/workflows/test.yml`) runs `npm test` on pushes and pull requests targeting `main`, so the latest commit stays green.
+Accounting firms gain:
 
-## Database Schema
+- 70–90% time savings  
+- Lower compliance risk  
+- Higher audit quality  
+- A scalable workflow they can standardise across clients  
 
-Initial Supabase tables live in `scripts/migrations/0001_initial_schema.sql`. Apply them with the Supabase CLI or `psql`:
+---
 
-```bash
-psql "$SUPABASE_DB_URL" -f scripts/migrations/0001_initial_schema.sql
-```
+## 3. Core Features (MVP)
 
-`scripts/migrations/0002_rls_policies.sql` enables row-level security and enforces organisation scoping via the `current_user_org_id()` helper. Run it after the base schema so all tables are protected.
+### A. Upload & Processing
+- Multi-tenant org + clients  
+- Batch upload (PDFs/ZIP)  
+- Supabase Storage + Edge Functions  
+- Cron-driven OCR pipeline  
+- Employee identity resolution  
+- Payslip extraction + normalisation  
 
-Smoke checks:
+### B. Rules Engine (MVP Set)
+- Large gross/net changes  
+- Tax spikes without gross movement  
+- USC/NI anomalies  
+- YTD regressions  
+- Pension threshold breaches  
+- PRSI/NI category changes  
 
-- `scripts/tests/schema_smoke_test.sql` – validates table creation.
-- `scripts/tests/rls_isolation_test.sql` – seeds two organisations, impersonates each user via `request.jwt.claim.sub`, and demonstrates that cross-org reads are blocked before rolling back.
+### C. Review UI
+- Batch-level summaries  
+- Employee-level comparisons  
+- Diff visualisation  
+- Issue resolution  
+- CSV/PDF exports  
 
-## Learn More
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) – features, API, and guides.
-- [Learn Next.js](https://nextjs.org/learn) – interactive tutorial.
+## 4. Extended Rules Engine (IE/UK)
 
-## Deploy on Vercel
+### Ireland (Revenue)
+- PAYE recalculation  
+- USC recalculation  
+- PRSI class verification  
+- Illness Benefit handling  
+- LPT deduction checks  
+- BIK/PSA consistency  
+- Year-end & cumulative basis handling  
 
-The easiest way to deploy the app is via [Vercel](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme). See the [deployment docs](https://nextjs.org/docs/app/building-your-application/deploying) for alternatives.
+### UK (HMRC)
+- PAYE tax code-based calculation  
+- NIC recalculation across categories  
+- Student loans / PG loans  
+- Auto-enrolment contributions  
+- National Minimum Wage compliance  
+- RTI submission reconciliation  
+
+---
+
+## 5. Additional Reconciliation Sources
+
+- Payroll Register (Gross-to-Net)  
+- General Ledger (GL) postings  
+- Bank payment files (SEPA/BACS)  
+- ROS (Ireland) and RTI (UK) submission summaries  
+- Contract / HR data  
+
+These allow Tally to evolve into a **full payroll audit and reconciliation platform**.
+
+---
+
+## 6. Architecture Summary
+
+### Frontend
+- Next.js + React  
+- Ant Design  
+- Vercel deployment  
+
+### Backend
+- Supabase Postgres (multi-tenant schema)  
+- Supabase Auth (user identities)  
+- Supabase Storage (payslips)  
+- Edge Functions (processing, ingestion, rules engine integration)  
+- Cron scheduling  
+
+### OCR
+- AWS Textract via secure Edge Function calls  
+
+### Pure Logic Modules
+- Normalisation  
+- Diff engine  
+- Rule engine (registry + config + jurisdiction packs)  
+
+---
+
+## 7. Workflow (End-to-End)
+
+1. Create organisation → add clients  
+2. Upload payslips for a payroll period  
+3. Supabase stores files → batch created  
+4. Processing jobs seeded  
+5. Cron pipeline runs:
+   - OCR → normalise → insert payslips  
+   - Load previous payslip → calculate diff  
+   - Run rules engine → generate issues  
+6. User reviews issues  
+7. User resolves, adds notes, or corrects in payroll system  
+8. Reports exported  
+9. Advanced users upload register, GL, bank, or RTI/ROS files  
+10. Reconciliation rules applied  
+11. Tally provides full audit and compliance picture  
+
+---
+
+## 8. Rule Engine Architecture
+
+- Rule Registry (data-driven definitions)  
+- Country/year-aware rule loading  
+- RuleConfig merging (country defaults → org defaults → client overrides)  
+- Pure evaluation (`evaluate(context)`)  
+- IssueCandidate outputs with structured evidence  
+- Golden test dataset ensures behaviour stability  
+
+---
+
+## 9. Roadmaps
+
+### MVP Roadmap
+Documented in `roadmap.html`.
+
+### Rules Engine Roadmap
+Documented in `tally_rules_engine_roadmap.html`.
+
+These roadmap files define the exact Cursor prompts, Definition of Done, and test expectations for each engineering milestone.
+
+---
+
+## 10. Future Expansion
+
+- Multi-country support (EU + US)  
+- API for payroll providers ("Tally Inside")  
+- Employee portal for personal payroll insights  
+- Predictive anomaly detection (ML layer)  
+- Firm-level dashboards and benchmarking  
+
+---
+
+## 11. Development Expectations
+
+- TDD as standard  
+- Pure logic modules must be deterministic and fully tested  
+- No business rules hard-coded into UI  
+- Multi-tenancy enforced at all layers  
+- Secrets only in Edge Functions  
+- Changes must update docs where relevant (`agent.md`, `architecture.md`, `design.md`, roadmaps)
+
+---
+
+# Summary
+
+You now have:
+
+### ✔ agent.md — rules for Cursor & AI assistants  
+### ✔ architecture.md — technical system blueprint (MVP + extended)  
+### ✔ design.md — UI/UX coverage including future rule settings  
+### ✔ readme.md — full product description and master narrative  
+
+If you want, I can also generate:
+
+- `client_rule_config.sql` schema  
+- A full ERD diagram  
+- A visual flowchart of the processing pipeline  
+- A single consolidated “developer onboarding doc”  
+
+Just tell me.

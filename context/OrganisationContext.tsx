@@ -19,10 +19,7 @@ export function OrganisationProvider({
   value,
   children,
 }: PropsWithChildren<{ value: OrganisationContextValue }>) {
-  const memoized = useMemo(
-    () => value,
-    [value.organisationId, value.profileId, value.role]
-  );
+  const memoized = useMemo(() => value, [value]);
   return (
     <OrganisationContext.Provider value={memoized}>
       {children}
@@ -37,4 +34,3 @@ export function useOrganisation() {
   }
   return ctx;
 }
-

@@ -6,7 +6,7 @@ const mockRouter = {
   push: vi.fn(),
 };
 
-let mockPathname = "/";
+const mockPathname = "/";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
@@ -70,4 +70,3 @@ describe("AppLayout", () => {
     expect(mockRouter.push).toHaveBeenCalledWith("/clients");
   });
 });
-

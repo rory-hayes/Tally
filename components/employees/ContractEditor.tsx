@@ -55,7 +55,7 @@ export function ContractEditor({ employeeId }: ContractEditorProps) {
         onFinish={onSubmit}
         autoComplete="off"
       >
-        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+        <Space orientation="vertical" style={{ width: "100%" }} size="middle">
           <Form.Item label="Salary amount" name="salary_amount">
             <InputNumber min={0} style={{ width: "100%" }} prefix="€" />
           </Form.Item>

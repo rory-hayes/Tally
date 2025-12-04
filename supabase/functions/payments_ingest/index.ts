@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.1";
+import { parsePaymentCsv, type PaymentRecord } from "../../../lib/payments/parser.ts";
 
 const SUPABASE_URL =
   Deno.env.get("PROJECT_URL") ??
@@ -23,31 +24,6 @@ const corsHeaders = {
 const parseNumber = (value: string | undefined) => {
   const num = Number((value ?? "").replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(num) ? num : 0;
-};
-
-const parseCsv = (csv: string) => {
-  const lines = csv
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-  const rows: any[] = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const parts = lines[i].split(",");
-    const record: Record<string, string> = {};
-    headers.forEach((header, idx) => {
-      record[header] = parts[idx] ?? "";
-    });
-    rows.push({
-      employee_id: (record["employee_id"] || "").trim() || null,
-      employee_ref: record["employee_ref"] ?? null,
-      amount: parseNumber(record["amount"] ?? record["net_pay"]),
-      currency: record["currency"] ?? null,
-      reference: record["reference"] ?? null,
-    });
-  }
-  return rows;
 };
 
 Deno.serve(async (req) => {
@@ -112,7 +88,11 @@ Deno.serve(async (req) => {
     });
   }
 
-  const rows = parseCsv(body);
+  const parsedRows = parsePaymentCsv(body);
+  const rows: PaymentRecord[] = parsedRows.map((row) => ({
+    ...row,
+    amount: parseNumber(String(row.amount)),
+  }));
   if (!rows.length) {
     return new Response(JSON.stringify({ error: "No payment rows parsed" }), {
       status: 400,

@@ -1,229 +1,284 @@
-# architecture.md – Tally MVP Architecture
+# architecture.md – Tally Full Architecture (MVP + Rules Engine Extension)
 
 ## 1. High-Level Overview
 
-Tally MVP uses:
+Tally is a B2B SaaS platform for accountants and payroll bureaus in Ireland and the UK.  
+It performs **automated payroll verification and reconciliation** by:
 
-- **Frontend**: Next.js (React), hosted on Vercel.
-- **Backend & Data**: Supabase:
-  - Postgres (core data store).
-  - Auth (user accounts).
-  - Storage (payslip PDFs).
-  - Edge Functions + cron (processing pipeline).
-- **External Services**:
-  - OCR API (e.g. AWS Textract or equivalent).
+- Extracting structured data from payslip PDFs (OCR)
+- Normalising the data into a consistent internal schema
+- Comparing each payslip against prior periods
+- Applying a rule engine (IE/UK tax rules + reconciliation rules)
+- Generating human-readable issues and audit reports
 
-All core application data (organisations, clients, batches, payslips, issues) lives in Supabase Postgres. The OCR layer is stateless and can be swapped out.
+Tally does **not** compute payroll — it verifies outputs from external payroll systems.
+
+### Technology Summary
+
+- **Frontend**: Next.js (React), Ant Design, deployed on Vercel  
+- **Backend**: Supabase  
+  - Postgres (application DB)
+  - Auth (multi-tenant users)
+  - Storage (payslips)
+  - Edge Functions (OCR + pipeline + ingestion)
+  - Cron jobs (background processing)
+- **OCR**: AWS Textract (via Edge Functions)
+- **Pure Logic Layer**:
+  - Normalisation of OCR → internal schema  
+  - Diff engine  
+  - Rules engine (country/year aware)  
+  - Reconciliation logic (post-MVP expansion)
+
+The architecture is designed to scale from a lightweight MVP to a robust, enterprise-grade system capable of reconciling large payroll datasets and integrating multiple upstream sources (GL, RTI/ROS, bank files, etc.).
+
+---
 
 ## 2. Multi-Tenancy Model
 
-- `organisations` table represents a practice or bureau.
-- Each `user` belongs to exactly one `organisation` (MVP).
-- Each `client` belongs to exactly one `organisation`.
-- All downstream entities (`batches`, `employees`, `payslips`, `issues`) are scoped to a `client` and ultimately to an `organisation`.
+Tally is multi-tenant at the organisation → client → employee hierarchy.
 
-Multi-tenancy is enforced via:
+- **Organisation**  
+  Represents an accounting practice.  
+  Each user belongs to exactly one organisation.
 
-- Explicit `organisation_id` columns on all relevant tables.
-- Supabase Row-Level Security policies restricting access by `organisation_id`.
-- Backend logic always filtering by `organisation_id` derived from the authenticated user.
+- **Client**  
+  A company serviced by the accountant.  
+  All batches, payslips, employees, issues belong to a client.
 
-## 3. Core Entities (Tables)
+### Enforcement
 
-**organisations**
+- All tables contain `organisation_id` to enforce row-level scoping.
+- Supabase **Row Level Security (RLS)** restricts all queries.
+- Service-level logic in Edge Functions re-validates org ownership.
+
+This ensures that:
+- Organisations cannot access each other’s clients or data.
+- Even malicious frontend modifications cannot bypass RLS.
+
+---
+
+## 3. Core Entities (MVP)
+
+### organisations
 - `id`
 - `name`
 - `created_at`
 
-**users**
-- Supabase auth user.
-- `id`
+### users (profiles)
+- `id` (Supabase auth)
 - `organisation_id`
+- `email`
 - `role` (`admin`, `staff`)
 - `created_at`
 
-**clients**
+### clients
 - `id`
 - `organisation_id`
 - `name`
 - `country` (`IE`, `UK`)
-- `payroll_system` (string)
+- `payroll_system`
 - `created_at`
 
-**batches**
+### batches
 - `id`
 - `organisation_id`
 - `client_id`
-- `period_label` (e.g., `2025-04`, or free text)
-- `storage_path` (text, path to original upload)
+- `period_label` (e.g. "2025-04")
 - `status` (`pending`, `processing`, `completed`, `failed`)
-- `error` (text, nullable)
-- `created_at`
-- `updated_at`
-- `status` (`pending`, `processing`, `completed`, `failed`)
+- `error` (nullable)
 - `total_files`
 - `processed_files`
 - `created_at`
+- `updated_at`
 - `completed_at` (nullable)
 
-**employees**
+### processing_jobs
+(One row per payslip file)
 - `id`
 - `organisation_id`
 - `client_id`
-- `external_employee_ref` (payroll system ID if available)
+- `batch_id`
+- `storage_path`
+- `employee_id` (nullable until OCR resolves)
+- `status` (`pending`, `processing`, `completed`, `failed`)
+- `error` (nullable)
+- `created_at`
+- `updated_at`
+
+### employees
+- `id`
+- `organisation_id`
+- `client_id`
+- `external_employee_ref`
 - `name`
-- `identifier_hash` (e.g. hashed PPS/NINO if used)
+- `identifier_hash` (hashed PPS/NINO)
 - `created_at`
 
-**payslips**
+### payslips
 - `id`
 - `organisation_id`
 - `client_id`
 - `batch_id`
 - `employee_id`
 - `pay_date`
-- `gross_pay`
-- `net_pay`
-- `paye`
-- `usc_or_ni`
-- `pension_employee`
-- `pension_employer`
-- `ytd_gross`
-- `ytd_net`
-- `ytd_tax`
-- `ytd_usc_or_ni`
-- `tax_code`
-- `prsi_or_ni_category`
-- `raw_ocr_json` (JSONB, optional)
-- `storage_path` (S3/Supabase path to original file)
+- Financial fields:
+  - `gross_pay`
+  - `net_pay`
+  - `paye`
+  - `usc_or_ni`
+  - `pension_employee`
+  - `pension_employer`
+  - `ytd_gross`
+  - `ytd_net`
+  - `ytd_tax`
+  - `ytd_usc_or_ni`
+  - `tax_code` (UK)
+  - `prsi_or_ni_category`
+- `raw_ocr_json` (JSONB)
+- `storage_path`
 - `created_at`
 
-**issues**
+### issues
 - `id`
 - `organisation_id`
 - `client_id`
 - `batch_id`
 - `employee_id`
 - `payslip_id`
-- `rule_code` (e.g. `NET_CHANGE_LARGE`)
+- `rule_code`
 - `severity` (`critical`, `warning`, `info`)
 - `description`
+- `data` (JSONB structured evidence)
 - `resolved` (bool)
-- `resolved_by` (user id, nullable)
-- `resolved_at` (nullable)
-- `note` (text, nullable)
+- `resolved_by` (nullable)
+- `resolved_at`
+- `note`
 - `created_at`
 
-**audit_logs**
-- `id`
-- `organisation_id`
-- `user_id`
-- `action` (e.g. `UPLOAD_BATCH`, `RESOLVE_ISSUE`)
-- `metadata` (JSONB)
-- `created_at`
+### audit_logs
+Event logging for compliance & traceability.
 
-## 4. Processing Pipeline (MVP)
+---
 
-1. **Upload**
-   - Frontend obtains a Storage signed URL from Supabase or uses Supabase client SDK.
-   - Files are uploaded to a private bucket (`payslips`) under a `batch`-specific prefix.
+## 4. Processing Pipeline
 
-2. **Batch Creation**
-   - A `batch` row is created with `status = 'pending'`, `total_files` set.
+### Step 1 — Upload
+- Frontend uploads PDFs to Supabase Storage.
+- Batch created with `status="pending"`.
 
-3. **Processing Trigger**
-   - A Supabase Edge Function `start_batch_processing` is called once upload completes.
-   - It enumerates files for the batch and inserts one row per file into a `processing_jobs` table or processes sequentially.
+### Step 2 — Job Seeding
+- `start_batch_processing(batchId)` enumerates uploaded files.
+- Creates one `processing_jobs` row per PDF.
 
-4. **Processing Execution**
-   - A cron-triggered Edge Function `process_next_jobs` runs periodically.
-   - For each pending job:
-     - Downloads file from Storage.
-     - Calls OCR API.
-     - Parses and normalises fields.
-     - Resolves/creates `employee`.
-     - Inserts `payslips` row.
-     - Runs rules to create `issues`.
-       - Current ruleset covers large net/gross changes, PAYE spikes without matching gross changes, USC/NI spikes without gross movement, PRSI/NI category changes, year-to-date regressions, and employee/employer pension contributions breaching configured thresholds.
-     - Updates job and `batches.processed_files`.
+### Step 3 — Cron Pipeline (process_next_jobs)
+For each pending job:
+1. Download PDF bytes from Storage  
+2. Call AWS Textract  
+3. Normalise into internal schema  
+4. Resolve employee identity  
+5. Insert payslip  
+6. Load previous payslip → calculate diff  
+7. Run rules engine → create issues  
+8. Update job status  
+9. Increment batch progress
 
-5. **Completion**
-   - When `processed_files == total_files`, `batches.status` is set to `completed` (or `failed` if errors > threshold).
+When all jobs complete → mark batch completed.
 
-## 5. Frontend–Backend Interaction
+---
 
-- Auth: Frontend uses Supabase Auth.
-- Data access:
-  - For simple reads, frontend may use Supabase client directly (subject to RLS).
-  - For complex flows (upload, processing triggers), frontend calls Supabase Edge Functions via HTTP.
+## 5. Rules Engine Architecture
 
-Endpoints / functions (MVP):
+The rules engine runs during pipeline processing after each payslip is inserted.
 
-- `start_batch_processing(batch_id)`: trigger processing.
-- `get_batch_summary(batch_id)`: aggregated counts and basic metrics (or built from client-side queries).
-- `generate_batch_report(batch_id)`: returns data to render/download as CSV/PDF.
+### Components
 
-## 6. Rules Engine + Registry
+- **RuleRegistry**  
+  A set of `RuleDefinition` objects:
+  - `code`
+  - `severity`
+  - `categories`
+  - `descriptionTemplate`
+  - `appliesTo` (country + tax years)
+  - `evaluate(context)`
 
-The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, etc.) are evaluated inside the processing pipeline after each payslip insert. To make the ruleset maintainable across different jurisdictions (IE/UK) and tax years, the engine now loads rules from a registry module instead of hard-coding logic.
+- **RuleConfig**  
+  - Thresholds (large change %, tolerances)
+  - Client overrides
+  - Default country/year settings
 
-- `lib/rules/registry.ts` exports:
-  - `RuleDefinition` objects describing rule metadata (`code`, `severity`, `categories`, `descriptionTemplate`, applicability by `country`/`tax_year`).
-  - `getActiveRules(country, taxYear)` which filters the registry for the current payslip context.
-- **Rule configuration**: Thresholds live in `RuleConfig` objects loaded via `lib/rules/config.ts`. Defaults are keyed by country + tax year, while bureau/client overrides are stored in `client_rule_config` (JSONB). The processing pipeline merges overrides with defaults and passes the resulting config into every rule evaluation so thresholds can vary per client without new deployments.
-- **Jurisdiction config**: Country-specific tax data (e.g., IE PAYE/USC/PRSI, UK PAYE/NIC/Student Loans) lives under `config/<country>/<year>.ts`. Loader utilities (e.g., `getIeConfigForYear`, `getUkConfigForYear`) expose typed structures that are attached to `RuleContext.config.ieConfig`/`ukConfig` whenever the payslip country matches, so downstream logic can read official rates/bands without hard-coding values.
-- Each rule definition provides an `evaluate(context)` function (pure) that inspects the current/previous payslip diff and returns zero or more `IssueCandidate`s.
-- `runRules(current, previous, diff, options)` simply fetches the active rule pack and executes each definition. Adding a new rule requires only appending a `RuleDefinition` entry; engine code stays unchanged.
-- Countries / tax years default to `IE` / derived from payslip `pay_date`, but clients can extend coverage by adding new definitions or packs.
-- **Severity model**:
-  - `info`: informational anomalies that highlight changes needing human awareness but rarely require immediate remediation (e.g., PRSI/NI category changes, OCR ingestion logging).
-  - `warning`: financially relevant anomalies that should be reviewed promptly but usually indicate configuration or data-entry issues (net/gross delta, PAYE/USC spikes, pension thresholds).
-  - `critical`: high-risk anomalies that almost always point to incorrect payroll outcomes (e.g., YTD regressions reducing statutory totals).
-  - Current rules and severities:
+- **Jurisdiction Config**  
+  - IE PAYE/USC/PRSI config per year  
+  - UK PAYE/NIC/Student Loan config per year  
 
-    | Rule code | Severity | Rationale |
-    |-----------|----------|-----------|
-    | `NET_CHANGE_LARGE` | warning | Material change to take-home pay |
-    | `GROSS_CHANGE_LARGE` | warning | Material change to gross earnings |
-    | `TAX_SPIKE_WITHOUT_GROSS` | warning | Tax spike while gross is flat |
-    | `USC_SPIKE_WITHOUT_GROSS` | warning | USC/NI spike while gross is flat |
-    | `YTD_REGRESSION` | critical | Statutory totals decreasing between periods |
-    | `PRSI_CATEGORY_CHANGE` | info | Compliance metadata change needing awareness |
-    | `PENSION_EMPLOYEE_HIGH` | warning | Employee pension exceeding configured % |
-    | `PENSION_EMPLOYER_HIGH` | info | Employer pension above threshold |
-    | `IE_PAYE_MISMATCH` | warning | Recomputed PAYE differs from payslip beyond tolerance |
-    | `IE_USC_MISMATCH` | warning | Recomputed USC differs from payslip beyond tolerance |
-    | `IE_PRSI_MISMATCH` | warning | Recomputed PRSI EE/ER contributions differ from payslip |
-    | `IE_PRSI_CLASS_UNUSUAL` | warning | Payslip PRSI class inconsistent with profile |
-    | `UK_PAYE_MISMATCH` | warning | Recomputed PAYE (using UK tax code & config) differs from payslip |
-    | `UK_NIC_MISMATCH` | warning | Recomputed NIC (EE/ER) differs from payslip |
-    | `UK_NIC_CATEGORY_UNUSUAL` | warning | NIC category letter inconsistent with profile |
-    | `UK_STUDENT_LOAN_MISMATCH` | warning | Student loan / PG loan deductions differ from expected |
-    | `REGISTER_PAYSPLIP_TOTAL_MISMATCH` | warning | Register totals vs payslip totals differ |
-    | `MISSING_REGISTER_ENTRY` | warning | Register missing entry for payslip employee |
-    | `MISSING_PAYSLIP` | warning | Register has employee without payslip |
-    | `GL_PAYROLL_TOTAL_MISMATCH` | warning | GL wages total differs from payslip gross |
-    | `GL_EMPLOYER_TAX_MISMATCH` | warning | GL employer taxes differ from payslip totals |
-    | `BANK_NETPAY_MISMATCH` | warning | Bank payment amounts differ from payslip net pay |
-    | `BANK_PAYMENT_WITHOUT_PAYSLIP` | warning | Bank payment exists with no matching payslip |
-    | `PAYSLIP_WITHOUT_PAYMENT` | warning | Payslip net pay lacks corresponding bank payment |
-    | `SUBMISSION_TOTAL_MISMATCH` | critical | ROS/RTI submission totals conflict with payslip totals |
-    | `SUBMISSION_EMPLOYEE_COUNT_MISMATCH` | critical | Submission employee count differs from payslips |
+- **RuleContext**  
+  Contains:
+  - `country`
+  - `taxYear`
+  - `currentPayslip`
+  - `previousPayslip`
+  - `diff`
+  - `config`
+  - `contractProfile`
+  - `registerRow`
+  - `glSummary`
+  - `bankPaymentRecord`
+  - `submissionSummary`
 
-- **Payroll register ingestion**: `payroll_register_entries` captures batch-level gross-to-net data per employee and batch totals, uploaded via an Edge Function that accepts CSV and upserts rows by batch/client. A reconciliation helper compares register rows to payslips to emit `REGISTER_PAYSPLIP_TOTAL_MISMATCH`, `MISSING_REGISTER_ENTRY`, and `MISSING_PAYSLIP` findings. Register context is optional so existing rules continue to operate without uploaded registers.
-- **Contract / HR data**: The `contracts` table stores optional employment profile data per employee (`salary_amount`, `salary_period`, `hourly_rate`, `standard_hours_per_week`, effective dates). Repository methods (`getContractForEmployee`, `upsertContract`) expose CRUD for the dashboard. `RuleContext.contractProfile` is optional and ensures existing rules remain stable when no contract data is present, while enabling future contract-compliance checks.
+### MVP Rules
+- NET_CHANGE_LARGE  
+- GROSS_CHANGE_LARGE  
+- TAX_SPIKE_WITHOUT_GROSS  
+- USC_SPIKE_WITHOUT_GROSS / NI_SPIKE  
+- PRSI_OR_NI_CATEGORY_CHANGE  
+- YTD_REGRESSION  
+- PENSION_EMPLOYEE_HIGH  
+- PENSION_EMPLOYER_HIGH  
 
-- **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.
+### Extended Rules (Post-MVP)
+(Defined fully in `tally_rules_engine_roadmap.html`)
 
-This layout keeps the business logic declarative and testable (registry tests ensure filtering works by country/year, and `runRules` integration tests verify that newly registered rules are automatically executed).
+- IE PAYE/USC/PRSI recalculation  
+- UK PAYE/NIC/Student Loans recalculation  
+- Contract compliance  
+- Payroll register reconciliation  
+- GL reconciliation  
+- Bank reconciliation  
+- ROS/RTI reconciliation  
 
-## 6. Migration Path to AWS
+---
 
-When scale or complexity demands:
+## 6. Planned Entities (Post-MVP)
 
-- Move storage for payslips from Supabase Storage → AWS S3.
-- Replace cron-based job processing with SQS + Lambda workers.
-- Keep Supabase for auth and application data until RDS is needed.
-- Introduce a dedicated API (AWS Lambda/ECS) in front of the database if required.
+These support the extended reconciliation engine:
 
-This design assumes the processing layer is stateless and can be migrated without changing the frontend contracts.
+### client_rule_config
+- Overrides for thresholds and rule packs.
+
+### contracts / employee_profiles
+- Salary/hourly info, standard hours, pension schemes, etc.
+
+### payroll_register_entries
+Gross-to-net report rows.
+
+### gl_postings
+Accounting system payroll postings.
+
+### payment_records
+Bank disbursement records (SEPA/BACS).
+
+### ros_submission_summaries / rti_submission_summaries
+Statutory submission totals (IE/UK).
+
+---
+
+## 7. Migration Path to AWS
+
+When scale demands:
+
+- Move Storage → S3  
+- Replace Edge cron with SQS + Lambda workers  
+- Replace Supabase Postgres → AWS RDS  
+- Add internal API Gateway for private backend  
+
+Architecture intentionally isolates the heavy work (OCR + rules) to make this easy.
+

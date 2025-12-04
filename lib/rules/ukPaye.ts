@@ -57,7 +57,7 @@ export const calcUkPaye = (
   } else {
     let remainingAnnual = taxableAnnual;
     let previousCap = 0;
-    bands.forEach((band, index) => {
+    bands.forEach((band) => {
       if (remainingAnnual <= 0) return;
       const upperCap = band.upTo ?? taxableAnnual;
       const bandSpan = upperCap - previousCap;

@@ -14,7 +14,7 @@ type ImageProps = {
 
 vi.mock("next/image", () => ({
   __esModule: true,
-  default: ({ src, alt, priority: _priority, ...rest }: ImageProps) =>
+  default: ({ src, alt, ...rest }: ImageProps) =>
     React.createElement("img", {
       ...rest,
       src: typeof src === "string" ? src : src?.src ?? "",
@@ -53,4 +53,3 @@ class ResizeObserverMock {
 }
 
 vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-

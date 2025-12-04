@@ -12,9 +12,6 @@ export type UkNicResult = {
   employerRateUsed: number;
 };
 
-const clamp = (value: number | null | undefined) =>
-  typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
-
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 export const normalizeNicCategory = (category?: string | null) => {

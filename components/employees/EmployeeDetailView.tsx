@@ -9,7 +9,6 @@ import {
   Descriptions,
   Empty,
   Input,
-  List,
   Modal,
   Row,
   Space,
@@ -124,7 +123,7 @@ const renderIssueDataDetails = (data?: Record<string, unknown> | null): ReactNod
   );
 };
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "long",
   day: "numeric",
@@ -169,12 +168,12 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
     }));
   }, [data]);
 
-const buildResolvedTooltip = (issue: IssueRow, profileId: string | null) => {
+  const buildResolvedTooltip = (issue: IssueRow, profileId: string | null) => {
     if (!issue.resolved || !issue.resolved_at) {
       return null;
     }
     const resolverLabel =
-    issue.resolved_by && profileId && issue.resolved_by === profileId
+      issue.resolved_by && profileId && issue.resolved_by === profileId
         ? "you"
         : issue.resolved_by ?? "another user";
     const resolvedDate = new Date(issue.resolved_at).toLocaleString(undefined, {
@@ -324,37 +323,27 @@ const buildResolvedTooltip = (issue: IssueRow, profileId: string | null) => {
       </Card>
 
       <Card title="Issues">
-        <List
-          data-testid="employee-issues-list"
-          dataSource={issueItems}
-          locale={{ emptyText: "No issues for this employee." }}
-          renderItem={(issue) => (
-            <List.Item
-              actions={[
-                <Button
-                  key="resolve"
-                  type="link"
-                  onClick={() => handleResolve(issue.id, issue.resolved)}
-                >
-                  {issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
-                </Button>,
-              ]}
-            >
-              <List.Item.Meta
-                title={
-                  (() => {
-                    const resolvedInfo = buildResolvedTooltip(issue, profileId);
-                    const descriptionNode = (
-                      <Typography.Text
-                        delete={issue.resolved}
-                        type={issue.resolved ? "secondary" : undefined}
-                        data-resolved-info={resolvedInfo ?? undefined}
-                      >
-                        {issue.description}
-                      </Typography.Text>
-                    );
-                    const content = (
-                      <Space>
+        <div data-testid="employee-issues-list">
+          {issueItems.length === 0 ? (
+            <Empty description="No issues for this employee." />
+          ) : (
+            <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
+              {issueItems.map((issue) => {
+                const resolvedInfo = buildResolvedTooltip(issue, profileId);
+                const descriptionNode = (
+                  <Typography.Text
+                    delete={issue.resolved}
+                    type={issue.resolved ? "secondary" : undefined}
+                    data-resolved-info={resolvedInfo ?? undefined}
+                  >
+                    {issue.description}
+                  </Typography.Text>
+                );
+
+                return (
+                  <Row key={issue.id} gutter={[8, 8]} align="middle">
+                    <Col flex="auto">
+                      <Space size="small" wrap>
                         <Tag color={severityColor[issue.severity]}>{issue.severity}</Tag>
                         {resolvedInfo ? (
                           <Tooltip title={resolvedInfo}>{descriptionNode}</Tooltip>
@@ -362,29 +351,33 @@ const buildResolvedTooltip = (issue: IssueRow, profileId: string | null) => {
                           descriptionNode
                         )}
                       </Space>
-                    );
-                    return content;
-                  })()
-                }
-                description={(() => {
-                  const noteNode = issue.note ? (
-                    <Typography.Text type="secondary">Note: {issue.note}</Typography.Text>
-                  ) : null;
-                  const dataNode = renderIssueDataDetails(issue.data);
-                  if (!noteNode && !dataNode) {
-                    return null;
-                  }
-                  return (
-                    <Space orientation="vertical" size="small">
-                      {noteNode}
-                      {dataNode}
-                    </Space>
-                  );
-                })()}
-              />
-            </List.Item>
+                      <div>
+                        {(() => {
+                          const noteNode = issue.note ? (
+                            <Typography.Text type="secondary">Note: {issue.note}</Typography.Text>
+                          ) : null;
+                          const dataNode = renderIssueDataDetails(issue.data);
+                          if (!noteNode && !dataNode) return null;
+                          return (
+                            <Space orientation="vertical" size="small">
+                              {noteNode}
+                              {dataNode}
+                            </Space>
+                          );
+                        })()}
+                      </div>
+                    </Col>
+                    <Col>
+                      <Button type="link" onClick={() => handleResolve(issue.id, issue.resolved)}>
+                        {issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
+                      </Button>
+                    </Col>
+                  </Row>
+                );
+              })}
+            </Space>
           )}
-        />
+        </div>
       </Card>
 
       <Modal

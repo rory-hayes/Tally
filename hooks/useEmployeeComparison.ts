@@ -44,7 +44,7 @@ export function useEmployeeComparison(employeeId: string, batchId: string) {
   }, [organisationId, employeeId, batchId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const toggleIssue = useCallback(
@@ -70,4 +70,3 @@ export function useEmployeeComparison(employeeId: string, batchId: string) {
 
   return { ...state, reload: load, toggleIssue };
 }
-

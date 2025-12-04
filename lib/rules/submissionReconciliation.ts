@@ -22,7 +22,7 @@ export const reconcileSubmissionTotals = (
     (acc, p) => {
       acc.paye += p.paye ?? 0;
       acc.usc_or_ni += p.usc_or_ni ?? 0;
-      acc.employeeIds.add((p as any).employee_id ?? (p as any).id ?? "");
+      acc.employeeIds.add(p.employee_id ?? p.id ?? "");
       return acc;
     },
     { paye: 0, usc_or_ni: 0, employeeIds: new Set<string>() }

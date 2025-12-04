@@ -22,9 +22,18 @@ vi.mock("antd", () => {
 
   const MockButton = ({
     children,
+    htmlType,
+    block,
+    loading,
     ...rest
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button {...rest}>{children}</button>
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    htmlType?: "button" | "submit" | "reset";
+    block?: boolean;
+    loading?: boolean;
+  }) => (
+    <button type={htmlType} data-block={block} data-loading={loading} {...rest}>
+      {children}
+    </button>
   );
 
   const MockAlert = ({
@@ -168,4 +177,3 @@ describe("LoginForm", () => {
     expect(await screen.findByText(/boom/)).toBeInTheDocument();
   });
 });
-

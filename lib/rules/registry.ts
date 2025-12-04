@@ -1,4 +1,4 @@
-import type { PayslipDiff, PayslipLike } from "@/lib/logic/payslipDiff";
+import type { PayslipDiff } from "@/lib/logic/payslipDiff";
 import { calcIePaye } from "@/lib/rules/iePaye";
 import { calcIeUsc } from "@/lib/rules/ieUsc";
 import { calcIePrsi, normalizePrsiClass, deriveWeeklyEarnings } from "@/lib/rules/iePrsi";

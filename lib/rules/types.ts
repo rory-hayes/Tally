@@ -25,7 +25,9 @@ export type RuleCode =
   | "UK_STUDENT_LOAN_MISMATCH"
   | "REGISTER_PAYSPLIP_TOTAL_MISMATCH"
   | "MISSING_REGISTER_ENTRY"
-  | "MISSING_PAYSLIP";
+  | "MISSING_PAYSLIP"
+  | "GL_PAYROLL_TOTAL_MISMATCH"
+  | "GL_EMPLOYER_TAX_MISMATCH";
 
 export type IssueDataPayload = Record<string, unknown>;
 

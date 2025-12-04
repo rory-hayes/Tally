@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { reconcileRegister } from "@/lib/rules/registerReconciliation";
+import { reconcileGlToPayslips } from "@/lib/rules/glReconciliation";
 
 describe("register reconciliation", () => {
   const payslips = [
@@ -38,5 +39,13 @@ describe("register reconciliation", () => {
       payslipGross: expect.any(Number),
       registerGross: expect.any(Number),
     });
+  });
+
+  it("flags GL mismatches when totals differ", () => {
+    const glIssues = reconcileGlToPayslips(
+      { wages: 10000, employer_taxes: 500, pensions: 0 },
+      payslips as any
+    );
+    expect(glIssues.map((i) => i.ruleCode)).toContain("GL_PAYROLL_TOTAL_MISMATCH");
   });
 });

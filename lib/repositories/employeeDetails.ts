@@ -41,6 +41,10 @@ type PayslipRecord = {
   net_pay?: number | null;
   paye?: number | null;
   usc_or_ni?: number | null;
+  nic_employee?: number | null;
+  nic_employer?: number | null;
+  student_loan?: number | null;
+  postgrad_loan?: number | null;
   pension_employee?: number | null;
   pension_employer?: number | null;
   ytd_gross?: number | null;
@@ -73,6 +77,10 @@ export async function fetchEmployeeComparison(args: {
         net_pay,
         paye,
         usc_or_ni,
+        nic_employee,
+        nic_employer,
+        student_loan,
+        postgrad_loan,
         pension_employee,
         pension_employer,
         ytd_gross,
@@ -224,4 +232,3 @@ export async function updateIssueResolution(args: {
     });
   }
 }
-

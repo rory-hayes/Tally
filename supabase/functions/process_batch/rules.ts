@@ -10,10 +10,11 @@ import type {
   RuleConfig,
   IeRuleContext,
   UkRuleContext,
+  ContractProfile,
 } from "../../../lib/rules/types.ts";
 
 export const PAYSLIP_SELECT_FIELDS =
-  "id, organisation_id, client_id, batch_id, employee_id, pay_date, gross_pay, net_pay, paye, usc_or_ni, pension_employee, pension_employer, ytd_gross, ytd_net, ytd_tax, ytd_usc_or_ni, prsi_or_ni_category, clients:clients (country)";
+  "id, organisation_id, client_id, batch_id, employee_id, pay_date, gross_pay, net_pay, paye, usc_or_ni, nic_employee, nic_employer, student_loan, postgrad_loan, pension_employee, pension_employer, ytd_gross, ytd_net, ytd_tax, ytd_usc_or_ni, prsi_or_ni_category, clients:clients (country)";
 
 export type PayslipForRules = PayslipLike & {
   id: string;
@@ -46,6 +47,7 @@ type BuildIssuesOptions = {
   config?: RuleConfig;
   ieContext?: IeRuleContext | null;
   ukContext?: UkRuleContext | null;
+  contractProfile?: ContractProfile | null;
 };
 
 export const buildIssuesForPayslip = (
@@ -70,6 +72,7 @@ export const buildIssuesForPayslip = (
     config: options?.config,
     ieContext: options?.ieContext ?? null,
     ukContext: options?.ukContext ?? null,
+    contractProfile: options?.contractProfile ?? null,
   });
 
   return issues.map((issue) => ({

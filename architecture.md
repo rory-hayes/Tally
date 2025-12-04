@@ -200,6 +200,8 @@ The anomaly detection rules (net/gross changes, USC spikes, pension thresholds, 
     | `UK_NIC_CATEGORY_UNUSUAL` | warning | NIC category letter inconsistent with profile |
     | `UK_STUDENT_LOAN_MISMATCH` | warning | Student loan / PG loan deductions differ from expected |
 
+- **Contract / HR data**: The `contracts` table stores optional employment profile data per employee (`salary_amount`, `salary_period`, `hourly_rate`, `standard_hours_per_week`, effective dates). Repository methods (`getContractForEmployee`, `upsertContract`) expose CRUD for the dashboard. `RuleContext.contractProfile` is optional and ensures existing rules remain stable when no contract data is present, while enabling future contract-compliance checks.
+
 - **Golden dataset**: `tests/fixtures/rulesGolden.ts` captures “correct payroll” and “known error patterns” for IE/UK. `tests/lib/logic/rulesGolden.test.ts` executes these scenarios through `runRules`, locking expected rule outputs + severities so future changes that alter behaviour must update the fixtures intentionally.
 
 This layout keeps the business logic declarative and testable (registry tests ensure filtering works by country/year, and `runRules` integration tests verify that newly registered rules are automatically executed).

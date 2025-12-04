@@ -26,10 +26,10 @@ export function useEmployeeContract(employeeId: string | null | undefined) {
   useEffect(() => {
     let active = true;
     if (!employeeId) return;
-    async function fetchContract() {
+    async function fetchContract(targetEmployeeId: string) {
       setState({ status: "loading", data: null, error: null });
       try {
-        const contract = await getContractForEmployee(organisationId, employeeId);
+        const contract = await getContractForEmployee(organisationId, targetEmployeeId);
         if (!active) return;
         setState({ status: "success", data: contract, error: null });
       } catch (err) {
@@ -41,7 +41,7 @@ export function useEmployeeContract(employeeId: string | null | undefined) {
         });
       }
     }
-    fetchContract();
+    fetchContract(employeeId);
     return () => {
       active = false;
     };

@@ -2,8 +2,8 @@ export type GlPosting = {
   wages: number;
   employer_taxes: number;
   pensions: number;
-  other?: number;
-  currency?: string | null;
+  other: number;
+  currency: string | null;
 };
 
 const parseNumber = (value: string | undefined) => {

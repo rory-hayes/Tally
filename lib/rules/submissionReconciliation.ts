@@ -6,13 +6,19 @@ const TOLERANCE = 1;
 
 const formatNumber = (value: number) => Number(value.toFixed(2));
 
+type SubmissionTotals = {
+  paye: number;
+  usc_or_ni: number;
+  employeeIds: Set<string>;
+};
+
 export const reconcileSubmissionTotals = (
   submission: SubmissionSummary | null | undefined,
   payslips: PayslipLike[]
 ): IssueCandidate[] => {
   if (!submission) return [];
 
-  const totals = payslips.reduce(
+  const totals = payslips.reduce<SubmissionTotals>(
     (acc, p) => {
       acc.paye += p.paye ?? 0;
       acc.usc_or_ni += p.usc_or_ni ?? 0;

@@ -52,8 +52,15 @@ export const parseRegisterCsv = (csv: string): RegisterEntry[] => {
   return entries;
 };
 
-export const sumPayslipTotals = (payslips: PayslipLike[]) => {
-  return payslips.reduce(
+type PayslipTotals = {
+  gross_pay: number;
+  net_pay: number;
+  paye: number;
+  usc_or_ni: number;
+};
+
+export const sumPayslipTotals = (payslips: PayslipLike[]): PayslipTotals => {
+  return payslips.reduce<PayslipTotals>(
     (acc, p) => {
       acc.gross_pay += p.gross_pay ?? 0;
       acc.net_pay += p.net_pay ?? 0;

@@ -62,7 +62,9 @@ const postCsvToEdge = async (fnName: string, query: QueryParams, csvBody: string
   const parsed = text ? (() => { try { return JSON.parse(text); } catch { return { raw: text }; } })() : {};
 
   if (!response.ok) {
-    const message = (parsed as { error?: string }).error ?? text || `HTTP ${response.status}`;
+    const message =
+      (parsed as { error?: string }).error ??
+      (text ?? `HTTP ${response.status}`);
     throw new Error(message);
   }
 

@@ -42,8 +42,6 @@ export default function AppLayout({ children }: PropsWithChildren) {
     return "dashboard";
   }, [pathname]);
 
-  const openKeys = [];
-
   const handleMenuClick: MenuProps["onClick"] = ({ key }) => {
     if (key === selectedKey) {
       return;
@@ -86,7 +84,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
-          openKeys={openKeys}
+          openKeys={[]}
           onOpenChange={() => undefined}
           onClick={handleMenuClick}
           items={menuItems}

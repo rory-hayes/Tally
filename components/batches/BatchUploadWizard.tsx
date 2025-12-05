@@ -156,9 +156,12 @@ export function BatchUploadWizard({
       message.error("Create the batch first.");
       return;
     }
-    const files = payslipFiles
-      .map((f) => f.originFileObj)
-      .filter((f): f is File => !!f);
+    const files = payslipFiles.reduce<File[]>((acc, file) => {
+      if (file.originFileObj) {
+        acc.push(file.originFileObj as File);
+      }
+      return acc;
+    }, []);
     if (!files.length) {
       message.warning("Select payslip files to upload.");
       return;

@@ -23,15 +23,12 @@ import { createBatchForClient } from "@/lib/repositories/batches";
 import { recordBatchDataFile } from "@/lib/repositories/batchDataFiles";
 import { listClientDataSources } from "@/lib/repositories/clientDataSources";
 import type { ClientDataSource } from "@/lib/repositories/clientDataSources";
-import { ingestRegisterCsv, ingestGlCsv, ingestBankPaymentsCsv, ingestSubmissionCsv } from "@/lib/functions/ingestion";
 import { getDefaultRuleConfig } from "@/lib/rules/config";
 import { upsertBatchRuleSnapshot } from "@/lib/repositories/batchRuleSnapshots";
 import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
 import { logAuditEvent } from "@/lib/repositories/auditLogs";
 import type { DataSourceType } from "@/types/dataSources";
 import { dataSourceLabels } from "@/types/dataSources";
-import { parseContractCsv } from "@/lib/contracts/parser";
-import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 type WizardProps = {
   organisationId: string;
@@ -63,6 +60,34 @@ const artefactTypes: DataSourceType[] = [
   "CONTRACT_SNAPSHOT",
 ];
 
+const artefactTemplates: Partial<
+  Record<
+    DataSourceType,
+    {
+      filename: string;
+      rows: string[][];
+    }
+  >
+> = {
+  PAYROLL_REGISTER: {
+    filename: "payroll_register_template.csv",
+    rows: [
+      [
+        "employee_id",
+        "gross_pay",
+        "net_pay",
+        "paye",
+        "usc_or_ni",
+        "nic_employee",
+        "nic_employer",
+        "student_loan",
+        "postgrad_loan",
+      ],
+      ["EMP001", "3000", "2100", "500", "100", "120", "140", "0", "0"],
+    ],
+  },
+};
+
 export function BatchUploadWizard({
   organisationId,
   profileId,
@@ -83,6 +108,28 @@ export function BatchUploadWizard({
         {} as Record<DataSourceType, UploadFile | null>
       )
   );
+  const [artefactErrors, setArtefactErrors] = useState<Record<DataSourceType, string | null>>(
+    () =>
+      artefactTypes.reduce(
+        (acc, type) => ({ ...acc, [type]: null }),
+        {} as Record<DataSourceType, string | null>
+      )
+  );
+  const [uploadingArtefactType, setUploadingArtefactType] = useState<DataSourceType | null>(null);
+  const [artefactUploadsCompleted, setArtefactUploadsCompleted] = useState(false);
+
+  const downloadTemplate = (type: DataSourceType) => {
+    const template = artefactTemplates[type];
+    if (!template) return;
+    const csv = template.rows.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = template.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
   const [dataSources, setDataSources] = useState<ClientDataSource[]>([]);
   const [loadingSources, setLoadingSources] = useState(false);
   const [selectedRulePacks, setSelectedRulePacks] = useState<string[]>([
@@ -196,82 +243,47 @@ export function BatchUploadWizard({
     }
   };
 
-  const handleArtefactUpload = async (type: DataSourceType, file: File) => {
-    if (!batchInfo) return;
+  const handleArtefactUpload = async (type: DataSourceType) => {
+    if (!batchInfo) {
+      message.error("Create the batch first.");
+      return;
+    }
+    const fileEntry = artefactFiles[type];
+    const file = fileEntry?.originFileObj as File | undefined;
+    if (!file) {
+      message.warning("Select a CSV file first.");
+      return;
+    }
+    setArtefactErrors((prev) => ({ ...prev, [type]: null }));
+    setUploadingArtefactType(type);
     try {
-      const uploads = await uploadBatchFiles(batchInfo.id, [file]);
-      const upload = uploads[0];
-      let parsedStatus: "pending" | "parsed" | "failed" = "pending";
-      let parsedError: string | null = null;
-      const csvText = await file.text();
-      try {
-        if (type === "PAYROLL_REGISTER") {
-          await ingestRegisterCsv({ batchId: batchInfo.id, clientId, csv: csvText });
-        } else if (type === "GL_EXPORT") {
-          await ingestGlCsv({ batchId: batchInfo.id, clientId, csv: csvText });
-        } else if (type === "BANK_PAYMENTS") {
-          await ingestBankPaymentsCsv({
-            batchId: batchInfo.id,
-            clientId,
-            csv: csvText,
-            fileName: file.name,
-          });
-        } else if (type === "STATUTORY_SUBMISSION") {
-          await ingestSubmissionCsv({
-            batchId: batchInfo.id,
-            clientId,
-            country: (clientCountry ?? "IE").toUpperCase(),
-            csv: csvText,
-          });
-        } else if (type === "CONTRACT_SNAPSHOT") {
-          const rows = parseContractCsv(csvText);
-          if (rows.length) {
-            const supabase = getSupabaseBrowserClient();
-            const { error } = await supabase.from("contracts").upsert(
-              rows.map((row) => ({
-                organisation_id: organisationId,
-                client_id: clientId,
-                employee_id: row.employee_id,
-                salary_amount: row.salary_amount,
-                salary_period: row.salary_period,
-                hourly_rate: row.hourly_rate,
-                standard_hours_per_week: row.standard_hours_per_week,
-                effective_from: row.effective_from,
-                effective_to: row.effective_to,
-                metadata: row.metadata ?? null,
-              })),
-              { onConflict: "employee_id" }
-            );
-            if (error) throw new Error(error.message);
-          }
-        }
-        parsedStatus = "parsed";
-      } catch (err) {
-        parsedStatus = "failed";
-        parsedError = err instanceof Error ? err.message : "Parse failed";
-      }
-      await recordBatchDataFile({
-        organisationId,
-        clientId,
-        batchId: batchInfo.id,
-        type,
-        storagePath: upload.path,
-        originalFilename: upload.originalName,
-        parsedStatus,
-        parsedError,
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("clientId", clientId);
+      formData.append("organisationId", organisationId);
+      formData.append("type", type);
+
+      const response = await fetch(`/api/batches/${batchInfo.id}/artefacts`, {
+        method: "POST",
+        body: formData,
       });
-      setArtefactFiles((prev) => ({ ...prev, [type]: null }));
-      setSummary((prev) => ({
-        ...prev,
-        [type]: parsedStatus === "parsed" ? "Attached" : "Failed",
-      }));
-      if (parsedStatus === "parsed") {
-        message.success(`${dataSourceLabels[type]} uploaded`);
-      } else {
-        message.error(parsedError ?? "Upload failed");
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const messageText = payload?.error ?? "Upload failed";
+        throw new Error(messageText);
       }
+
+      setArtefactFiles((prev) => ({ ...prev, [type]: null }));
+      setSummary((prev) => ({ ...prev, [type]: "Uploaded" }));
+      setArtefactUploadsCompleted(true);
+      message.success(`${dataSourceLabels[type]} uploaded`);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "Upload failed");
+      const messageText = err instanceof Error ? err.message : "Upload failed";
+      setArtefactErrors((prev) => ({ ...prev, [type]: messageText }));
+      message.error(messageText);
+    } finally {
+      setUploadingArtefactType(null);
     }
   };
 
@@ -301,7 +313,7 @@ export function BatchUploadWizard({
           {type === "GROSS_TO_NET" && "Batch-level summary from payroll system."}
         </Typography.Paragraph>
         <Upload.Dragger
-          disabled={!configured}
+          disabled={!configured || uploadingArtefactType === type}
           multiple={false}
           accept=".csv"
           fileList={file ? [file] : []}
@@ -314,25 +326,33 @@ export function BatchUploadWizard({
               originFileObj: rcFile,
             };
             setArtefactFiles((prev) => ({ ...prev, [type]: uploadFile }));
+            setArtefactErrors((prev) => ({ ...prev, [type]: null }));
             return false;
           }}
           onRemove={() => {
             setArtefactFiles((prev) => ({ ...prev, [type]: null }));
+            setArtefactErrors((prev) => ({ ...prev, [type]: null }));
           }}
           style={{ marginBottom: 12 }}
         >
           <p className="ant-upload-drag-icon">Drop CSV here or click to browse</p>
         </Upload.Dragger>
+        <Space direction="vertical" style={{ width: "100%" }} size="small">
+          {artefactTemplates[type] ? (
+            <Button type="link" onClick={() => downloadTemplate(type)} size="small">
+              Download template
+            </Button>
+          ) : null}
+          {artefactErrors[type] ? (
+            <Typography.Text type="danger">{artefactErrors[type]}</Typography.Text>
+          ) : null}
+        </Space>
         <Button
           type="primary"
           block
-          disabled={!configured || !file}
-          onClick={() => {
-            const rcFile = file?.originFileObj as File | undefined;
-            if (rcFile) {
-              void handleArtefactUpload(type, rcFile);
-            }
-          }}
+          disabled={!configured || !file || uploadingArtefactType === type}
+          loading={uploadingArtefactType === type}
+          onClick={() => void handleArtefactUpload(type)}
         >
           Upload
         </Button>
@@ -449,6 +469,20 @@ export function BatchUploadWizard({
             {artefactCards}
           </Space>
           {loadingSources ? <Typography.Text>Loading mappings…</Typography.Text> : null}
+          <Space direction="vertical">
+            <Button
+              type="primary"
+              disabled={!artefactUploadsCompleted}
+              onClick={() => setCurrentStep(3)}
+            >
+              Continue to rule packs
+            </Button>
+            <Typography.Text type={artefactUploadsCompleted ? "secondary" : "danger"}>
+              {artefactUploadsCompleted
+                ? "You can keep uploading additional artefacts even after moving on."
+                : "Upload at least one artefact to continue."}
+            </Typography.Text>
+          </Space>
         </Space>
       ),
     },

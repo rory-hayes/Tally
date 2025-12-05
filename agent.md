@@ -100,3 +100,9 @@ When generating or modifying code:
   - `tally_rules_engine_roadmap.html`: post-MVP rules engine & reconciliation tasks.
 
 Before making structural changes, read `architecture.md`, `design.md`, and the relevant roadmap to ensure alignment.
+
+## 2025 QA Remediation Notes
+
+- New data-source screens live under `/data/*` (contracts, register, GL, payments, submissions) and call existing Edge Functions.  
+- Rules configuration UI is at `/settings` and writes to `client_rule_config`; `RuleConfig` now supports severity overrides, enrichment toggles, and golden dataset payloads.  
+- Batch flow: failed OCR now marks batches as `failed`, provides retry/delete actions, and improves CSV/print behaviour. Respect these flows when extending the UI.

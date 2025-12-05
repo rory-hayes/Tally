@@ -10,6 +10,7 @@ describe("ClientFormModal", () => {
       <ClientFormModal
         open
         title="Add client"
+        initialValues={{ country: "UK" }}
         onCancel={() => undefined}
         onSubmit={handleSubmit}
       />
@@ -22,7 +23,11 @@ describe("ClientFormModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(
-      () => expect(handleSubmit).toHaveBeenCalledWith({ name: "Acme" }),
+      () =>
+        expect(handleSubmit).toHaveBeenCalledWith({
+          name: "Acme",
+          country: "UK",
+        }),
       { timeout: 7000 }
     );
   });
@@ -49,5 +54,4 @@ describe("ClientFormModal", () => {
     expect(handleSubmit).not.toHaveBeenCalled();
   });
 });
-
 

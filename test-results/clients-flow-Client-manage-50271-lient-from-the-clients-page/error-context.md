@@ -1,0 +1,103 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e6] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e7]:
+      - img [ref=e8]
+    - generic [ref=e11]:
+      - button "Open issues overlay" [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: "1"
+          - generic [ref=e15]: "2"
+        - generic [ref=e16]:
+          - text: Issue
+          - generic [ref=e17]: s
+      - button "Collapse issues badge" [ref=e18]:
+        - img [ref=e19]
+  - alert [ref=e21]
+  - generic [ref=e22]:
+    - complementary [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: Tally
+        - menu [ref=e26]:
+          - menuitem "dashboard Dashboard" [ref=e27] [cursor=pointer]:
+            - img "dashboard" [ref=e28]:
+              - img [ref=e29]
+            - generic [ref=e31]: Dashboard
+          - menuitem "team Clients" [ref=e32] [cursor=pointer]:
+            - img "team" [ref=e33]:
+              - img [ref=e34]
+            - generic [ref=e36]: Clients
+          - menuitem "setting Settings" [ref=e37] [cursor=pointer]:
+            - img "setting" [ref=e38]:
+              - img [ref=e39]
+            - generic [ref=e41]: Settings
+    - generic [ref=e42]:
+      - banner [ref=e43]:
+        - heading "Practice Overview" [level=4] [ref=e44]
+        - button "Sign out" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]: Sign out
+      - main [ref=e47]:
+        - generic [ref=e48]:
+          - generic [ref=e50]:
+            - generic [ref=e52]:
+              - heading "Clients" [level=3] [ref=e53]
+              - generic [ref=e54]: Manage payroll clients across your organisation.
+            - button "Add client" [ref=e56] [cursor=pointer]:
+              - generic [ref=e57]: Add client
+          - table [ref=e67]:
+            - rowgroup [ref=e68]:
+              - row "Name Country Payroll System Employees processed Actions" [ref=e69]:
+                - columnheader "Name" [ref=e70]
+                - columnheader "Country" [ref=e71]
+                - columnheader "Payroll System" [ref=e72]
+                - columnheader "Employees processed" [ref=e73]
+                - columnheader "Actions" [ref=e74]
+            - rowgroup [ref=e75]:
+              - row "ACME Ltd IE BrightPay 2 Edit Delete" [ref=e76] [cursor=pointer]:
+                - cell "ACME Ltd" [ref=e77]:
+                  - link "ACME Ltd" [ref=e78]:
+                    - /url: /clients/client-1
+                - cell "IE" [ref=e79]
+                - cell "BrightPay" [ref=e80]
+                - cell "2" [ref=e81]
+                - cell "Edit Delete" [ref=e82]:
+                  - button "Edit" [ref=e83]:
+                    - generic [ref=e84]: Edit
+                  - button "Delete" [ref=e85]:
+                    - generic [ref=e86]: Delete
+  - generic [ref=e87]:
+    - dialog "Add client":
+      - generic [ref=e88]:
+        - button "Close" [ref=e89] [cursor=pointer]:
+          - generic "Close" [ref=e90]:
+            - img "close" [ref=e91]:
+              - img [ref=e92]
+        - generic [ref=e95]: Add client
+        - generic [ref=e97]:
+          - generic [ref=e99]:
+            - generic "Client name" [ref=e101]: "* Client name"
+            - textbox "* Client name" [ref=e105]:
+              - /placeholder: Eg. ACME Advisory
+              - text: Beacon Co
+          - generic [ref=e107]:
+            - generic "Country" [ref=e109]
+            - generic [ref=e113] [cursor=pointer]:
+              - generic [ref=e114]:
+                - generic: Select country
+                - combobox "Country" [ref=e115]
+              - img "down" [ref=e117]:
+                - img [ref=e118]
+          - generic [ref=e121]:
+            - generic "Payroll system" [ref=e123]
+            - textbox "Payroll system" [ref=e127]:
+              - /placeholder: Eg. Sage
+        - generic [ref=e128]:
+          - button "Cancel" [ref=e129] [cursor=pointer]:
+            - generic [ref=e130]: Cancel
+          - button "loading Save" [active] [ref=e131] [cursor=pointer]:
+            - generic:
+              - img "loading"
+            - generic [ref=e132]: Save
+```

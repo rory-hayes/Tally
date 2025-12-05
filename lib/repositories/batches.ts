@@ -168,4 +168,19 @@ export async function updateBatchStatus(
   return data as unknown as BatchRow;
 }
 
+export async function deleteBatch(
+  organisationId: string,
+  batchId: string
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase
+    .from("batches")
+    .delete()
+    .eq("organisation_id", organisationId)
+    .eq("id", batchId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
 

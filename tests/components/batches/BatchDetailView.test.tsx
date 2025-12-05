@@ -51,6 +51,12 @@ vi.mock("@/components/batches/BatchReportModal", () => ({
     ) : null,
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+}));
+
 const draggerHandle: { beforeUpload?: (file: unknown) => unknown } = {};
 
 vi.mock("antd", async () => {
@@ -312,4 +318,3 @@ describe("BatchDetailView", () => {
     await waitFor(() => expect(refreshMock).toHaveBeenCalled());
   });
 });
-

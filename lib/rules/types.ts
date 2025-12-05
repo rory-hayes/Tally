@@ -90,6 +90,16 @@ export type RuleConfig = {
   pensionEmployerPercent: number;
   ieConfig?: IeTaxYearConfig | null;
   ukConfig?: UkTaxYearConfig | null;
+  enabledRulePacks?: string[];
+  countryOverride?: CountryCode | null;
+  taxYearOverride?: number | null;
+  severityOverrides?: Partial<Record<RuleCode, IssueSeverity>>;
+  enrichment?: {
+    includeEvidence?: boolean;
+    includeBandBreakdown?: boolean;
+    includeGoldenContext?: boolean;
+  } | null;
+  goldenDataset?: unknown;
 };
 
 export type IeRuleContext = {

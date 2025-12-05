@@ -1,0 +1,55 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - generic [ref=e10]:
+      - text: Compiling
+      - generic [ref=e11]:
+        - generic [ref=e12]: .
+        - generic [ref=e13]: .
+        - generic [ref=e14]: .
+  - alert [ref=e15]
+  - generic [ref=e16]:
+    - complementary [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: Tally
+        - menu [ref=e20]:
+          - menuitem "dashboard Dashboard" [ref=e21] [cursor=pointer]:
+            - img "dashboard" [ref=e22]:
+              - img [ref=e23]
+            - generic [ref=e25]: Dashboard
+          - menuitem "team Clients" [ref=e26] [cursor=pointer]:
+            - img "team" [ref=e27]:
+              - img [ref=e28]
+            - generic [ref=e30]: Clients
+          - menuitem "setting Settings" [ref=e31] [cursor=pointer]:
+            - img "setting" [ref=e32]:
+              - img [ref=e33]
+            - generic [ref=e35]: Settings
+    - generic [ref=e36]:
+      - banner [ref=e37]:
+        - heading "Practice Overview" [level=4] [ref=e38]
+        - button "Sign out" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: Sign out
+      - main [ref=e41]:
+        - generic [ref=e42]:
+          - heading "Practice Overview" [level=3] [ref=e43]
+          - generic [ref=e44]: Track batches and issues across all clients.
+          - table [ref=e53]:
+            - rowgroup [ref=e54]:
+              - row "Client Latest batch Issues" [ref=e55]:
+                - columnheader "Client" [ref=e56]
+                - columnheader "Latest batch" [ref=e57]
+                - columnheader "Issues" [ref=e58]
+            - rowgroup [ref=e59]:
+              - 'row "ACME Ltd 2025-02 Critical: 0 Warning: 1 Info: 0" [ref=e60]':
+                - cell "ACME Ltd" [ref=e61]:
+                  - link "ACME Ltd" [ref=e62] [cursor=pointer]:
+                    - /url: /clients/client-1
+                - cell "2025-02" [ref=e63]
+                - 'cell "Critical: 0 Warning: 1 Info: 0" [ref=e64]':
+                  - generic [ref=e65]: "Critical: 0"
+                  - generic [ref=e66]: "Warning: 1"
+                  - generic [ref=e67]: "Info: 0"
+```

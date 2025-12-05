@@ -132,3 +132,26 @@ A dedicated tab on each client:
 - Client-level theme customization  
 - Full payroll or HR workflow  
 - Drag-and-drop rules editor (future)  
+
+---
+
+## 8. New Navigation & Screens (2025 QA fixes)
+
+- **Sidebar** now includes a “Data sources” group with: Contracts & HR, Payroll register, GL payroll postings, Bank payments, Revenue/HMRC submissions, plus “Rules & Settings”.  
+- Use consistent Ant Design patterns: `Card` + vertical `Form`, `Upload.Dragger`, `Select` for client/batch selection, progress/alerts for failures.
+
+### 8.1 Data Source Upload Patterns
+- Always require client (and batch where applicable).  
+- Validate file type/size; show template CSV snippet inline.  
+- Surface help text about OCR/CSV expectations and sandbox file paths.  
+- Success toast only after Edge Function returns 200.
+
+### 8.2 Settings / Rules Config
+- Form-driven, grouped into thresholds, rule packs, severity overrides, enrichment.  
+- Show severity model + golden dataset previews in collapsibles.  
+- “Reset to defaults” removes client override row; “Save” upserts into `client_rule_config`.
+
+### 8.3 Batch Review Improvements
+- Status tag colours: completed (green), processing (blue), failed (red), pending (gold).  
+- Buttons: Download CSV, View report (printable window), Retry failed, Delete batch.  
+- Failed jobs alert includes remediation guidance; upload dragger shows accepted formats and size limits.

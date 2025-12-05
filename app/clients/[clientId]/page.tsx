@@ -12,13 +12,14 @@ import {
   Typography,
   Button,
   message,
+  Popconfirm,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import AppLayout from "@/components/layout/AppLayout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useOrganisation } from "@/context/OrganisationContext";
 import { ClientRow, getClientById } from "@/lib/repositories/clients";
-import { BatchRow, createBatchForClient, getBatchesForClient } from "@/lib/repositories/batches";
+import { BatchRow, createBatchForClient, deleteBatch, getBatchesForClient } from "@/lib/repositories/batches";
 import { logAuditEvent } from "@/lib/repositories/auditLogs";
 import { CreateBatchModal } from "@/components/batches/CreateBatchModal";
 
@@ -31,7 +32,8 @@ const statusColorMap: Record<string, string> = {
 };
 
 function useBatchColumns(
-  onOpenBatch: (batch: BatchRow) => void
+  onOpenBatch: (batch: BatchRow) => void,
+  onDeleteBatch: (batch: BatchRow) => void
 ): ColumnsType<BatchRow> {
   return useMemo(
     () => [
@@ -67,13 +69,25 @@ function useBatchColumns(
         key: "actions",
         align: "right" as const,
         render: (_value, record) => (
-          <Button type="link" onClick={() => onOpenBatch(record)}>
-            Open
-          </Button>
+          <Space>
+            <Button type="link" onClick={() => onOpenBatch(record)}>
+              Open
+            </Button>
+            <Popconfirm
+              title="Delete this batch?"
+              okText="Delete"
+              cancelText="Cancel"
+              onConfirm={() => onDeleteBatch(record)}
+            >
+              <Button type="link" danger>
+                Delete
+              </Button>
+            </Popconfirm>
+          </Space>
         ),
       },
     ],
-    [onOpenBatch]
+    [onOpenBatch, onDeleteBatch]
   );
 }
 
@@ -142,6 +156,18 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
     }
   }, [clientId, organisationId]);
 
+  const handleBatchDelete = async (batch: BatchRow) => {
+    try {
+      await deleteBatch(organisationId, batch.id);
+      message.success("Batch deleted");
+      fetchBatches();
+    } catch (err) {
+      message.error(
+        err instanceof Error ? err.message : "Unable to delete batch"
+      );
+    }
+  };
+
   useEffect(() => {
     fetchClient();
     fetchBatches();
@@ -183,8 +209,9 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
     }
   };
 
-  const columns = useBatchColumns((batch) =>
-    router.push(`/batches/${batch.id}`)
+  const columns = useBatchColumns(
+    (batch) => router.push(`/batches/${batch.id}`),
+    handleBatchDelete
   );
 
   if (clientLoading) {
@@ -267,5 +294,3 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
     </Space>
   );
 }
-
-

@@ -13,18 +13,21 @@ import {
   Typography,
   Upload,
   message,
+  Popconfirm,
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type { UploadFile, RcFile } from "antd/es/upload/interface";
 import { useOrganisation } from "@/context/OrganisationContext";
 import { useBatchDetail } from "@/hooks/useBatchDetail";
 import type { IssueSeverity } from "@/lib/repositories/batchDetails";
-import { updateBatchStatus } from "@/lib/repositories/batches";
+import { deleteBatch, updateBatchStatus } from "@/lib/repositories/batches";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
 import { invokeCreateProcessingJobs } from "@/lib/functions/createProcessingJobs";
 import { downloadBatchIssuesCsv } from "@/lib/functions/downloadBatchIssuesCsv";
 import { BatchReportModal } from "@/components/batches/BatchReportModal";
 import { logAuditEvent } from "@/lib/repositories/auditLogs";
+import { retryFailedJobs } from "@/lib/repositories/processingJobs";
+import { useRouter } from "next/navigation";
 
 type BatchDetailViewProps = {
   batchId: string;
@@ -38,11 +41,14 @@ const severityColors: Record<IssueSeverity, string> = {
 
 export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const { organisationId, profileId } = useOrganisation();
+  const router = useRouter();
   const { status, data, error, refresh } = useBatchDetail(batchId);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -69,6 +75,16 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         setFileList((prev) => prev.filter((item) => item.uid !== file.uid));
       },
       beforeUpload: (file: RcFile) => {
+        const isPdf = file.type?.includes("pdf") || file.name.toLowerCase().endsWith(".pdf");
+        const maxSizeMb = 15;
+        if (!isPdf) {
+          message.error(`${file.name} is not a PDF. Please upload PDF payslips.`);
+          return false;
+        }
+        if (file.size / 1024 / 1024 > maxSizeMb) {
+          message.error(`${file.name} is too large. Limit ${maxSizeMb}MB per file.`);
+          return false;
+        }
         setFileList((prev) => [
           ...prev,
           {
@@ -151,6 +167,46 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     }
   };
 
+  const handleRetryFailed = async () => {
+    if (!batch) return;
+    setRetrying(true);
+    try {
+      const resetCount = await retryFailedJobs(organisationId, batch.id);
+      if (resetCount === 0) {
+        message.info("No failed files to retry.");
+        return;
+      }
+      await updateBatchStatus(organisationId, batch.id, {
+        status: "processing",
+        processed_files: Math.max((batch.processed_files ?? 0) - resetCount, 0),
+      });
+      message.success(`Retrying ${resetCount} file(s)`);
+      await refresh();
+    } catch (err) {
+      message.error(
+        err instanceof Error ? err.message : "Unable to retry failed files"
+      );
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const handleDeleteBatch = async () => {
+    if (!batch) return;
+    setDeleting(true);
+    try {
+      await deleteBatch(organisationId, batch.id);
+      message.success("Batch deleted");
+      router.push(`/clients/${batch.client_id}`);
+    } catch (err) {
+      message.error(
+        err instanceof Error ? err.message : "Unable to delete batch"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (status === "loading" || status === "idle") {
     return (
       <div style={{ minHeight: "50vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -211,6 +267,10 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     : null;
   const hasActiveJobs = data.jobs.pending + data.jobs.processing > 0;
   const hasFailedJobs = data.jobs.failedJobs.length > 0;
+  const derivedStatus =
+    batch.status === "processing" && hasFailedJobs && !hasActiveJobs
+      ? "failed"
+      : batch.status;
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
@@ -221,6 +281,18 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
               Download CSV
             </Button>
             <Button onClick={() => setReportVisible(true)}>View report</Button>
+            <Button onClick={handleRetryFailed} loading={retrying} disabled={!hasFailedJobs}>
+              Retry failed
+            </Button>
+            <Popconfirm
+              title="Delete this batch?"
+              okText="Delete"
+              cancelText="Cancel"
+              onConfirm={handleDeleteBatch}
+              okButtonProps={{ loading: deleting, danger: true }}
+            >
+              <Button danger loading={deleting}>Delete batch</Button>
+            </Popconfirm>
           </Space>
         }
       >
@@ -232,8 +304,18 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         </Typography.Paragraph>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Status:{" "}
-          <Tag color={batch.status === "completed" ? "green" : "gold"}>
-            {batch.status}
+          <Tag
+            color={
+              derivedStatus === "completed"
+                ? "green"
+                : derivedStatus === "failed"
+                ? "red"
+                : derivedStatus === "processing"
+                ? "blue"
+                : "gold"
+            }
+          >
+            {derivedStatus}
           </Tag>
         </Typography.Paragraph>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
@@ -256,13 +338,18 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             style={{ marginTop: 12 }}
             title={`${data.jobs.failed} file(s) failed during processing`}
             description={
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {data.jobs.failedJobs.map((job) => (
-                  <li key={job.id}>
-                    {job.storagePath.split("/").pop()} {job.error ? `– ${job.error}` : ""}
-                  </li>
-                ))}
-              </ul>
+              <Space direction="vertical">
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {data.jobs.failedJobs.map((job) => (
+                    <li key={job.id}>
+                      {job.storagePath.split("/").pop()} {job.error ? `– ${job.error}` : ""}
+                    </li>
+                  ))}
+                </ul>
+                <Typography.Text type="secondary">
+                  Check that each PDF contains selectable text and is not encrypted. Then click “Retry failed.”
+                </Typography.Text>
+              </Space>
             }
           />
         )}
@@ -325,7 +412,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
           </p>
           {fileList.length === 0 && (
             <Typography.Text type="secondary">
-              Select one or more PDF files to enable upload.
+              Select one or more PDF files to enable upload. Accepted: PDF, up to 15MB each. You can drag from your desktop; in test sandboxes place files in a visible folder (e.g. share/slides).
             </Typography.Text>
           )}
         </Upload.Dragger>
@@ -354,4 +441,3 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     </Space>
   );
 }
-

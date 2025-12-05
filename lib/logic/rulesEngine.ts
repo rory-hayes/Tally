@@ -63,9 +63,11 @@ export const runRules = (
     );
 
     results.forEach((result) => {
+      const severityOverride =
+        derivedConfig.severityOverrides?.[rule.code] ?? null;
       issues.push({
         ruleCode: rule.code,
-        severity: result.severity ?? rule.severity,
+        severity: severityOverride ?? result.severity ?? rule.severity,
         description: result.description ?? rule.descriptionTemplate,
         data: result.data,
       });

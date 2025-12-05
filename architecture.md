@@ -282,3 +282,58 @@ When scale demands:
 
 Architecture intentionally isolates the heavy work (OCR + rules) to make this easy.
 
+---
+
+## 8. Post-MVP Reconciliation Inputs (UI + Edge)
+
+The following data sources now have dedicated upload screens (Ant Design + guarded forms) and map to existing Edge Functions/DB tables:
+
+- **Contract & HR data**  
+  - Screen: `/data/contracts`  
+  - Parses contract CSV and upserts into `contracts` (org/client scoped).  
+  - Enriches `RuleContext.contractProfile` (optional).
+
+- **Payroll register (gross-to-net)**  
+  - Screen: `/data/register` → Edge `register_ingest` → `payroll_register_entries`.  
+  - Reconciliation rules: `REGISTER_PAYSPLIP_TOTAL_MISMATCH`, `MISSING_REGISTER_ENTRY`, `MISSING_PAYSLIP`.
+
+- **GL payroll postings**  
+  - Screen: `/data/gl` → Edge `gl_ingest` → `gl_payroll_postings`.  
+  - Rules: `GL_PAYROLL_TOTAL_MISMATCH`, `GL_EMPLOYER_TAX_MISMATCH`.
+
+- **Bank payment files (SEPA/BACS CSV)**  
+  - Screen: `/data/payments` → Edge `payments_ingest` → `payment_files` + `payment_records`.  
+  - Rules: `BANK_NETPAY_MISMATCH`, `BANK_PAYMENT_WITHOUT_PAYSLIP`, `PAYSLIP_WITHOUT_PAYMENT`.
+
+- **Revenue.ie / HMRC submissions**  
+  - Screen: `/data/submissions` → Edge `submission_ingest` → `ros_submission_summaries` / `rti_submission_summaries`.  
+  - Rules: `SUBMISSION_TOTAL_MISMATCH`, `SUBMISSION_EMPLOYEE_COUNT_MISMATCH`.
+
+All upload helpers sit in `lib/functions/ingestion.ts` and require a valid Supabase session (Bearer token + apikey).
+
+---
+
+## 9. Rules Engine Configuration UI
+
+- Screen: `/settings` (sidebar “Rules & Settings”).  
+- Persists overrides to `client_rule_config.config` (JSON).  
+- Supports:
+  - Country/tax year overrides.
+  - Rule pack toggles (core tax, reconciliation, contract compliance).
+  - Thresholds/tolerances (net/gross deltas, PAYE/USC/NI spikes, pension %).  
+  - Severity overrides per rule (stored as `severityOverrides`).  
+  - Enrichment toggles (expected vs actual, band breakdown, golden context).  
+  - Golden dataset JSON viewer/editor (mirrors `lib/rules/goldenDataset.ts`).
+- Engine support:
+  - `RuleConfig` extended with `enabledRulePacks`, `severityOverrides`, `enrichment`, `countryOverride`, `taxYearOverride`, `goldenDataset`.
+  - `runRules` honours `severityOverrides`.
+
+---
+
+## 10. Batch Lifecycle UX Adjustments
+
+- **Status updates:** Edge `process_batch` now recalculates progress after each job (success or failure) and marks batches `failed` when all files processed with errors.  
+- **Retry:** UI button “Retry failed” resets failed `processing_jobs` to `pending`, resets `processed_files`, and resumes processing.  
+- **Delete:** Batch delete available in batch detail and client batch table (`batches` cascade cleanup).  
+- **CSV/Print:** Batch report modal opens a printable window; CSV download streams from the `batch-issues-csv` Edge Function.  
+- **Upload UX:** PDF-only guard, size limit, guidance for sandbox paths, clearer failure messaging for OCR-empty PDFs.

@@ -23,6 +23,12 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["lib/supabaseMock.ts", "types/**/*.d.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
     rules: {
       "react-hooks/set-state-in-effect": "off",
     },

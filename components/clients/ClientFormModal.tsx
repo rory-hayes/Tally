@@ -69,11 +69,19 @@ export function ClientFormModal({
         >
           <Input placeholder="Eg. ACME Advisory" />
         </Form.Item>
-        <Form.Item label="Country" name="country">
+        <Form.Item
+          label="Country"
+          name="country"
+          rules={[{ required: true, message: "Select country" }]}
+        >
           <Select
-            allowClear
             placeholder="Select country"
             options={countryOptions}
+            showSearch
+            optionFilterProp="label"
+            onChange={(value) => {
+              form.setFieldValue("country", value ?? null);
+            }}
           />
         </Form.Item>
         <Form.Item label="Payroll system" name="payroll_system">
@@ -83,5 +91,4 @@ export function ClientFormModal({
     </Modal>
   );
 }
-
 

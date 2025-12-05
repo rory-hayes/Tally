@@ -5,7 +5,6 @@ import {
 } from "npm:@aws-sdk/client-textract";
 import {
   NormalizedTextractResult,
-  buildBatchUpdatePayload,
   buildPayslipInsert,
   deriveIdentifierFromPath,
   derivePayDateFromBatch,
@@ -177,7 +176,7 @@ async function handleJob(
     await insertInfoIssue(supabase, job, employeeId, normalized);
     await insertRuleIssues(supabase, currentPayslip, previousPayslip);
     await markJobStatus(supabase, job.id, true);
-    await updateBatchProgress(supabase, job.batch_id);
+    await refreshBatchProgress(supabase, job.batch_id);
 
     console.log(`[process_batch] Job ${job.id} completed`);
     return { id: job.id, status: "completed" as const };
@@ -186,6 +185,7 @@ async function handleJob(
       err instanceof Error ? err.message : "Unknown processing error";
     console.error(`[process_batch] Job ${job.id} failed`, message);
     await markJobStatus(supabase, job.id, false, message);
+    await refreshBatchProgress(supabase, job.batch_id);
     return { id: job.id, status: "failed" as const, error: message };
   }
 }
@@ -357,27 +357,47 @@ async function markJobStatus(
     .eq("id", jobId);
 }
 
-async function updateBatchProgress(
+async function refreshBatchProgress(
   supabase: ReturnType<typeof createClient>,
   batchId: string
 ) {
-  const { data: batch, error } = await supabase
-    .from("batches")
-    .select("processed_files, total_files")
-    .eq("id", batchId)
-    .maybeSingle();
+  const { data: jobs, error: jobsError } = await supabase
+    .from("processing_jobs")
+    .select("status")
+    .eq("batch_id", batchId);
 
-  if (error || !batch) {
-    throw new Error(error?.message ?? "Unable to load batch");
+  if (jobsError) {
+    throw new Error(jobsError.message);
   }
 
-  const nextProcessed = (batch.processed_files ?? 0) + 1;
-  const updates = buildBatchUpdatePayload(
-    nextProcessed,
-    batch.total_files ?? 0
-  );
+  const statuses = jobs ?? [];
+  const processed = statuses.filter((job) =>
+    job.status === "completed" || job.status === "failed"
+  ).length;
+  const failed = statuses.filter((job) => job.status === "failed").length;
+  const total = statuses.length;
 
-  await supabase.from("batches").update(updates).eq("id", batchId);
+  const updates: Record<string, unknown> = {
+    processed_files: processed,
+  };
+
+  if (total > 0) {
+    updates.total_files = total;
+  }
+
+  if (processed >= total && total > 0) {
+    updates.status = failed > 0 ? "failed" : "completed";
+    updates.completed_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from("batches")
+    .update(updates)
+    .eq("id", batchId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 type BatchMeta = {
@@ -440,4 +460,3 @@ async function loadRuleConfigForClient(
   const override = (data as ClientRuleConfigRow | null)?.config ?? null;
   return mergeRuleConfig(baseConfig, override);
 }
-

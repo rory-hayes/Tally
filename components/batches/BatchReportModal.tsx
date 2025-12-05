@@ -53,7 +53,77 @@ export function BatchReportModal({
   );
 
   const handlePrint = () => {
-    if (typeof window !== "undefined" && window.print) {
+    if (typeof window === "undefined") return;
+    let printWindow: Window | null = null;
+    try {
+      printWindow = window.open("", "_blank", "noopener,noreferrer");
+    } catch (err) {
+      printWindow = null;
+    }
+    const printableHtml = `
+      <html>
+        <head>
+          <title>Batch report ${batch.period_label}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 16px; }
+            h1, h2, h3 { margin: 0 0 8px; }
+            table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; }
+            .summary { margin-top: 12px; }
+            .tag { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #1677ff; color: white; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>Batch issue report</h1>
+          <div>Period: <strong>${batch.period_label}</strong></div>
+          <div class="summary">Status: <span class="tag">${batch.status}</span> • Created ${new Date(batch.created_at).toLocaleString()}</div>
+          <h2>Summary</h2>
+          <ul>
+            <li>Employees processed: ${totals.employeesProcessed}</li>
+            <li>Critical issues: ${totals.critical}</li>
+            <li>Warnings: ${totals.warning}</li>
+            <li>Info issues: ${totals.info}</li>
+          </ul>
+          ${
+            employees.length
+              ? `<h2>Employee issues</h2>
+                <table>
+                  <thead>
+                    <tr><th>Employee</th><th>Reference</th><th>Critical</th><th>Warning</th><th>Info</th></tr>
+                  </thead>
+                  <tbody>
+                    ${employees
+                      .map(
+                        (row) =>
+                          `<tr>
+                            <td>${row.employeeName}</td>
+                            <td>${row.employeeRef ?? "—"}</td>
+                            <td>${row.issues.critical}</td>
+                            <td>${row.issues.warning}</td>
+                            <td>${row.issues.info}</td>
+                          </tr>`
+                      )
+                      .join("")}
+                  </tbody>
+                </table>`
+              : "<p>No issues for this batch.</p>"
+          }
+        </body>
+      </html>
+    `;
+    if (!printWindow) {
+      if (window.print) {
+        window.print();
+      }
+      return;
+    }
+    printWindow.document.write(printableHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    if (printWindow.print) {
+      printWindow.print();
+    } else if (window.print) {
       window.print();
     }
   };
@@ -120,4 +190,3 @@ const SummaryCard = ({ label, value }: SummaryCardProps) => (
     </Typography.Title>
   </div>
 );
-

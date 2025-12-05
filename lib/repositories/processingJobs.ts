@@ -41,4 +41,23 @@ export async function createProcessingJob(input: {
   return data as ProcessingJobRow;
 }
 
+export async function retryFailedJobs(
+  organisationId: string,
+  batchId: string
+): Promise<number> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("processing_jobs")
+    .update({ status: "pending", error: null })
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId)
+    .eq("status", "failed")
+    .select("id");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).length;
+}
 

@@ -271,6 +271,15 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     batch.status === "processing" && hasFailedJobs && !hasActiveJobs
       ? "failed"
       : batch.status;
+  const dataFileBadges =
+    data.dataFiles && data.dataFiles.length
+      ? data.dataFiles.map((file) => ({
+          key: `${file.type}-${file.original_filename ?? ""}`,
+          label: file.original_filename ?? file.type,
+          status: file.parsed_status,
+          type: file.type,
+        }))
+      : [];
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
@@ -321,6 +330,19 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Created: {createdAt}
         </Typography.Paragraph>
+        {dataFileBadges.length ? (
+          <Typography.Paragraph style={{ marginBottom: 0 }}>
+            Attached artefacts:{" "}
+            {dataFileBadges.map((file) => (
+              <Tag
+                key={file.key}
+                color={file.status === "parsed" ? "green" : file.status === "failed" ? "red" : "default"}
+              >
+                {file.type}: {file.label}
+              </Tag>
+            ))}
+          </Typography.Paragraph>
+        ) : null}
           {processedLabel && (
             <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
               <span data-testid="batch-file-progress">{processedLabel}</span>

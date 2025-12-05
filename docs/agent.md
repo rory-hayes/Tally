@@ -106,3 +106,4 @@ Before making structural changes, read `architecture.md`, `design.md`, and the r
 - New data-source screens live under `/data/*` (contracts, register, GL, payments, submissions) and call existing Edge Functions.  
 - Rules configuration UI is at `/settings` and writes to `client_rule_config`; `RuleConfig` now supports severity overrides, enrichment toggles, and golden dataset payloads.  
 - Batch flow: failed OCR now marks batches as `failed`, provides retry/delete actions, and improves CSV/print behaviour. Respect these flows when extending the UI.
+- Client page now has a Data sources tab for per-client mapping JSON (register/GL/bank/submission/contract). The batch upload wizard (`/clients/[clientId]/batches/new`) guides period setup, payslip upload, monthly artefacts, rule pack selection, and review before triggering processing and saving a `batch_rule_config_snapshot`.

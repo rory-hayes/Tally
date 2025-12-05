@@ -54,7 +54,9 @@ describe("AppLayout", () => {
 
     expect(screen.getByRole("menuitem", { name: /dashboard/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /clients/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /settings/i })).toBeVisible();
+    expect(
+      screen.getByRole("menuitem", { name: /rules & settings/i })
+    ).toBeVisible();
   });
 
   it("signs out when button is clicked", async () => {

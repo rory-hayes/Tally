@@ -323,15 +323,16 @@ async function insertRuleIssues(
   const taxYear = currentPayslip.pay_date
     ? new Date(currentPayslip.pay_date).getUTCFullYear()
     : null;
-  const config = await loadRuleConfigForClient(
+  const { config, overrideCountry } = await loadRuleConfigForBatch(
     supabase,
     currentPayslip.organisation_id,
     currentPayslip.client_id,
+    currentPayslip.batch_id,
     country,
     taxYear
   );
   const rows = buildIssuesForPayslip(currentPayslip, previousPayslip, {
-    country,
+    country: overrideCountry ?? country,
     taxYear,
     config,
   });
@@ -459,4 +460,41 @@ async function loadRuleConfigForClient(
 
   const override = (data as ClientRuleConfigRow | null)?.config ?? null;
   return mergeRuleConfig(baseConfig, override);
+}
+
+async function loadRuleConfigForBatch(
+  supabase: ReturnType<typeof createClient>,
+  organisationId: string,
+  clientId: string,
+  batchId: string,
+  country: CountryCode | null,
+  taxYear: number | null
+): Promise<{ config: RuleConfig; overrideCountry: CountryCode | null }> {
+  const { data, error } = await supabase
+    .from("batch_rule_config_snapshot")
+    .select("country, resolved_config")
+    .eq("organisation_id", organisationId)
+    .eq("client_id", clientId)
+    .eq("batch_id", batchId)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    throw new Error(error.message);
+  }
+
+  if (data && data.resolved_config) {
+    return {
+      config: data.resolved_config as RuleConfig,
+      overrideCountry: (data.country as CountryCode | null) ?? country,
+    };
+  }
+
+  const fallback = await loadRuleConfigForClient(
+    supabase,
+    organisationId,
+    clientId,
+    country,
+    taxYear
+  );
+  return { config: fallback, overrideCountry: country };
 }

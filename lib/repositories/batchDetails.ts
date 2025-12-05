@@ -41,6 +41,11 @@ export type BatchDetail = {
     info: number;
   };
   jobs: JobSummary;
+  dataFiles?: {
+    type: string;
+    original_filename: string | null;
+    parsed_status: string;
+  }[];
 };
 
 type PayslipRecord = {
@@ -202,6 +207,12 @@ export async function fetchBatchDetail(
     throw new Error(`Failed to load processing jobs: ${jobsError.message}`);
   }
 
+  const { data: dataFiles } = await supabase
+    .from("batch_data_files")
+    .select("type, original_filename, parsed_status")
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId);
+
   const normalizedPayslips = payslips
     ? ((payslips as unknown as PayslipRecord[]).map((p) => ({
         ...p,
@@ -223,6 +234,6 @@ export async function fetchBatchDetail(
       ...totals,
     },
     jobs,
+    dataFiles: (dataFiles as { type: string; original_filename: string | null; parsed_status: string }[]) ?? [],
   };
 }
-

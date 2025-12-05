@@ -13,15 +13,15 @@ import {
   Button,
   message,
   Popconfirm,
+  Tabs,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import AppLayout from "@/components/layout/AppLayout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useOrganisation } from "@/context/OrganisationContext";
 import { ClientRow, getClientById } from "@/lib/repositories/clients";
-import { BatchRow, createBatchForClient, deleteBatch, getBatchesForClient } from "@/lib/repositories/batches";
-import { logAuditEvent } from "@/lib/repositories/auditLogs";
-import { CreateBatchModal } from "@/components/batches/CreateBatchModal";
+import { BatchRow, deleteBatch, getBatchesForClient } from "@/lib/repositories/batches";
+import { ClientDataSourcesTab } from "@/components/clients/ClientDataSourcesTab";
 
 const statusColorMap: Record<string, string> = {
   pending: "default",
@@ -120,7 +120,7 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
   const [clientLoading, setClientLoading] = useState(true);
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [batchesLoading, setBatchesLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("batches");
 
   const fetchClient = useCallback(async () => {
     if (!clientId) return;
@@ -173,42 +173,6 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
     fetchBatches();
   }, [fetchClient, fetchBatches]);
 
-  const handleBatchSubmit = async (values: {
-    periodLabel: string;
-    notes?: string | null;
-  }) => {
-    try {
-      const actorId = profileId ?? "system";
-      const newBatch = await createBatchForClient(organisationId, {
-        clientId,
-        periodLabel: values.periodLabel,
-        notes: values.notes ?? null,
-        totalFiles: 0,
-        processedFiles: 0,
-        status: "pending",
-      });
-      setBatches((prev) => [newBatch, ...prev]);
-      setModalOpen(false);
-      message.success("Batch created. Continue with upload.");
-      await logAuditEvent({
-        organisationId,
-        actorId,
-        action: "batch_created",
-        metadata: {
-          batchId: newBatch.id,
-          clientId,
-          periodLabel: values.periodLabel,
-        },
-      });
-      router.push(`/batches/${newBatch.id}`);
-    } catch (err) {
-      message.error(
-        err instanceof Error ? err.message : "Unable to create batch"
-      );
-      throw err;
-    }
-  };
-
   const columns = useBatchColumns(
     (batch) => router.push(`/batches/${batch.id}`),
     handleBatchDelete
@@ -249,48 +213,78 @@ export function ClientDetailContent({ clientId }: ClientDetailContentProps) {
             {client.payroll_system ?? "Payroll system TBD"}
           </Typography.Paragraph>
         </div>
-        <Button type="primary" onClick={() => setModalOpen(true)}>
-          Upload batch
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            onClick={() => router.push(`/clients/${clientId}/batches/new`)}
+          >
+            Upload new batch
+          </Button>
+        </Space>
       </Space>
 
-      <Card title="Client profile">
-        <Space orientation="vertical">
-          <Typography.Text>
-            <strong>Country:</strong> {client.country ?? "—"}
-          </Typography.Text>
-          <Typography.Text>
-            <strong>Payroll system:</strong> {client.payroll_system ?? "—"}
-          </Typography.Text>
-        </Space>
-      </Card>
+      <Card>
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: "batches",
+              label: "Batches",
+              children: (
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  <Card
+                    title="Client profile"
+                    size="small"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Space orientation="vertical">
+                      <Typography.Text>
+                        <strong>Country:</strong> {client.country ?? "—"}
+                      </Typography.Text>
+                      <Typography.Text>
+                        <strong>Payroll system:</strong>{" "}
+                        {client.payroll_system ?? "—"}
+                      </Typography.Text>
+                    </Space>
+                  </Card>
 
-      <Card
-        title="Batches"
-        extra={
-          <Typography.Text type="secondary">
-            Track uploads and processing status
-          </Typography.Text>
-        }
-      >
-        {batches.length === 0 && !batchesLoading ? (
-          <Empty description="No batches yet. Upload your first payroll batch." />
-        ) : (
-          <Table<BatchRow>
-            rowKey="id"
-            dataSource={batches}
-            loading={batchesLoading}
-            columns={columns}
-            pagination={false}
-          />
-        )}
+                  <Card
+                    title="Batches"
+                    extra={
+                      <Typography.Text type="secondary">
+                        Track uploads and processing status
+                      </Typography.Text>
+                    }
+                  >
+                    {batches.length === 0 && !batchesLoading ? (
+                      <Empty description="No batches yet. Upload your first payroll batch." />
+                    ) : (
+                      <Table<BatchRow>
+                        rowKey="id"
+                        dataSource={batches}
+                        loading={batchesLoading}
+                        columns={columns}
+                        pagination={false}
+                      />
+                    )}
+                  </Card>
+                </Space>
+              ),
+            },
+            {
+              key: "data-sources",
+              label: "Data sources",
+              children: (
+                <ClientDataSourcesTab
+                  organisationId={organisationId}
+                  clientId={clientId}
+                />
+              ),
+            },
+          ]}
+        />
       </Card>
-
-      <CreateBatchModal
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onSubmit={handleBatchSubmit}
-      />
     </Space>
   );
 }

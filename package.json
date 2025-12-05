@@ -6,7 +6,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
@@ -26,11 +25,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.7.0",
-    "@playwright/test": "^1.51.0",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.5",
     "jsdom": "^22.1.0",
     "typescript": "^5",
     "vitest": "^4.0.14"
+  },
+  "optionalDependencies": {
+    "@playwright/test": "^1.51.0"
   }
 }

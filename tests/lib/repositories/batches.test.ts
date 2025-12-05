@@ -43,13 +43,16 @@ describe("batches repository", () => {
       organisation_id: "org-1",
       client_id: "client-1",
       period_label: "Jan 2025",
+      pay_date: null,
+      pay_frequency: null,
+      selected_rule_packs: [],
       status: "pending",
       total_files: 5,
       processed_files: 0,
       notes: null,
     });
     expect(select).toHaveBeenCalledWith(
-      "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes"
+      "id, organisation_id, client_id, period_label, pay_date, pay_frequency, selected_rule_packs, status, total_files, processed_files, notes"
     );
   });
 
@@ -94,7 +97,7 @@ describe("batches repository", () => {
     expect(eq).toHaveBeenNthCalledWith(1, "organisation_id", "org-1");
     expect(eq).toHaveBeenNthCalledWith(2, "id", "batch-1");
     expect(select).toHaveBeenCalledWith(
-      "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes"
+      "id, organisation_id, client_id, period_label, pay_date, pay_frequency, selected_rule_packs, status, total_files, processed_files, notes"
     );
   });
 
@@ -119,5 +122,4 @@ describe("calculateBatchEmployeeCounts", () => {
     expect(counts.get("batch-2")).toBe(1);
   });
 });
-
 

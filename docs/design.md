@@ -155,3 +155,22 @@ A dedicated tab on each client:
 - Status tag colours: completed (green), processing (blue), failed (red), pending (gold).  
 - Buttons: Download CSV, View report (printable window), Retry failed, Delete batch.  
 - Failed jobs alert includes remediation guidance; upload dragger shows accepted formats and size limits.
+
+### 8.4 Client data sources tab
+- On client page, tabs for **Batches** and **Data sources**.  
+- Data sources tab lists artefact types with mapping/template name, status, last used, and a Configure action that opens a JSON mapping editor.  
+- No uploads here; mappings are used by the batch wizard.
+
+### 8.5 Batch upload wizard
+- Route: `/clients/[clientId]/batches/new`.  
+- Steps:
+  1) Batch details (period label, pay date, frequency)  
+  2) Payslip upload (required PDFs/ZIP)  
+  3) Monthly artefacts (register/GL/bank/submission/contract, enabled when mappings exist)  
+  4) Rule pack selection (core tax, reconciliation, contract)  
+  5) Review & confirm, then start processing  
+- Show inline counts and tags for attached artefacts; guide users to configure mappings if disabled.
+
+### 8.6 Navigation
+- Sidebar now: Dashboard, Clients, Rules & Settings (no top-level Data sources link).  
+- Batch CTA on client page routes to the wizard.

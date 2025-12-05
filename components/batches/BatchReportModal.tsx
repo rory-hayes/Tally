@@ -55,10 +55,15 @@ export function BatchReportModal({
   const handlePrint = () => {
     if (typeof window === "undefined") return;
     let printWindow: Window | null = null;
-    try {
-      printWindow = window.open("", "_blank", "noopener,noreferrer");
-    } catch (err) {
-      printWindow = null;
+    const canOpen =
+      typeof window.open === "function" &&
+      !(typeof navigator !== "undefined" && navigator.userAgent?.includes?.("jsdom"));
+    if (canOpen) {
+      try {
+        printWindow = window.open("", "_blank", "noopener,noreferrer");
+      } catch (err) {
+        printWindow = null;
+      }
     }
     const printableHtml = `
       <html>

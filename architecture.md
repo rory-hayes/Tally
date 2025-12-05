@@ -337,3 +337,28 @@ All upload helpers sit in `lib/functions/ingestion.ts` and require a valid Supab
 - **Delete:** Batch delete available in batch detail and client batch table (`batches` cascade cleanup).  
 - **CSV/Print:** Batch report modal opens a printable window; CSV download streams from the `batch-issues-csv` Edge Function.  
 - **Upload UX:** PDF-only guard, size limit, guidance for sandbox paths, clearer failure messaging for OCR-empty PDFs.
+
+---
+
+## 11. Client Data Source Mappings & Batch Wizard
+
+- **Schema additions**
+  - `client_data_sources` — per-client mapping JSON for each artefact type (register, GL, bank, submissions, contract, gross-to-net).
+  - `batch_data_files` — tracks all uploaded files per batch (payslip PDFs + monthly artefacts) with parse status and metadata.
+  - `batch_rule_config_snapshot` — resolved rule config & selected packs for reproducibility.
+  - `batches` extended with `pay_date`, `pay_frequency`, `selected_rule_packs`.
+
+- **Client page**
+  - Tabs: **Batches** (existing) and **Data sources** (mapping configuration only).
+  - Data sources tab lists types, template name, status, last used; configure opens JSON editor persisted to `client_data_sources`.
+
+- **Batch upload wizard** (`/clients/[clientId]/batches/new`)
+  1) Batch details: period label, pay date, frequency → creates `batches` row (pending).
+  2) Payslips: upload PDFs/ZIP → stored + `batch_data_files` rows (type `PAYSLIP_PDF`).
+  3) Monthly artefacts: cards enabled when mappings exist; uploads create `batch_data_files` rows and call edge ingestion (`register_ingest`, `gl_ingest`, `payments_ingest`, `submission_ingest`, contract upsert).
+  4) Rule packs: choose packs (core tax, reconciliation, contract); snapshot saved to `batch_rule_config_snapshot` and `batches.selected_rule_packs`.
+  5) Review & confirm: starts processing via `create-processing-jobs`.
+
+- **Processing**
+  - `process_batch` now prefers `batch_rule_config_snapshot.resolved_config`; falls back to client defaults.
+  - Batch progress recalculated from `processing_jobs`, marking batches failed when all jobs fail.

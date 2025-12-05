@@ -5,6 +5,9 @@ export type BatchRow = {
   organisation_id: string;
   client_id: string;
   period_label: string;
+  pay_date?: string | null;
+  pay_frequency?: string | null;
+  selected_rule_packs?: string[] | null;
   status: string;
   total_files: number;
   processed_files: number;
@@ -15,6 +18,9 @@ export type BatchRow = {
 export type CreateBatchInput = {
   clientId: string;
   periodLabel: string;
+  payDate?: string | null;
+  payFrequency?: string | null;
+  selectedRulePacks?: string[] | null;
   totalFiles: number;
   processedFiles?: number;
   status?: "pending" | "processing" | "completed" | "failed";
@@ -22,7 +28,7 @@ export type CreateBatchInput = {
 };
 
 const BATCH_COLUMNS =
-  "id, organisation_id, client_id, period_label, status, total_files, processed_files, notes";
+  "id, organisation_id, client_id, period_label, pay_date, pay_frequency, selected_rule_packs, status, total_files, processed_files, notes";
 
 type BatchEmployeeRow = {
   batch_id: string | null;
@@ -57,6 +63,9 @@ export async function createBatchForClient(
     organisation_id: organisationId,
     client_id: input.clientId,
     period_label: input.periodLabel,
+    pay_date: input.payDate ?? null,
+    pay_frequency: input.payFrequency ?? null,
+    selected_rule_packs: input.selectedRulePacks ?? [],
     status: input.status ?? "pending",
     total_files: input.totalFiles,
     processed_files: input.processedFiles ?? 0,
@@ -138,7 +147,7 @@ export async function updateBatchStatus(
   updates: Partial<
     Pick<
       BatchRow,
-      "status" | "total_files" | "processed_files" | "notes"
+      "status" | "total_files" | "processed_files" | "notes" | "selected_rule_packs"
     >
   >
 ): Promise<BatchRow> {
@@ -183,4 +192,3 @@ export async function deleteBatch(
     throw new Error(error.message);
   }
 }
-

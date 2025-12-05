@@ -13,10 +13,15 @@ function generateObjectPath(batchId: string, fileName: string) {
   return `batches/${batchId}/${Date.now()}-${unique}-${safeName}`;
 }
 
+export type UploadedBatchFile = {
+  path: string;
+  originalName: string;
+};
+
 export async function uploadBatchFiles(
   batchId: string,
   files: File[]
-): Promise<string[]> {
+): Promise<UploadedBatchFile[]> {
   if (!files.length) {
     return [];
   }
@@ -28,7 +33,7 @@ export async function uploadBatchFiles(
   const supabase = getSupabaseBrowserClient();
   const storage = supabase.storage.from(BUCKET);
 
-  const uploadedPaths: string[] = [];
+  const uploadedPaths: UploadedBatchFile[] = [];
 
   for (const file of files) {
     const path = generateObjectPath(batchId, file.name);
@@ -42,10 +47,9 @@ export async function uploadBatchFiles(
       throw new Error(error.message);
     }
 
-    uploadedPaths.push(path);
+    uploadedPaths.push({ path, originalName: file.name });
   }
 
   return uploadedPaths;
 }
-
 

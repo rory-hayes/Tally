@@ -44,37 +44,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
-vi.mock("@/components/batches/CreateBatchModal", () => {
-  const React = require("react");
-  return {
-    CreateBatchModal: ({
-      open,
-      onSubmit,
-      onCancel,
-    }: {
-      open: boolean;
-      onSubmit: (values: { periodLabel: string }) => Promise<void>;
-      onCancel: () => void;
-    }) => {
-      const [period, setPeriod] = React.useState("");
-      if (!open) return null;
-      return (
-        <div data-testid="batch-modal">
-          <input
-            aria-label="period"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-          />
-          <button onClick={() => onSubmit({ periodLabel: period })}>
-            Submit batch
-          </button>
-          <button onClick={onCancel}>Cancel</button>
-        </div>
-      );
-    },
-  };
-});
-
 vi.mock("antd", async () => {
   const actual = await vi.importActual<typeof import("antd")>("antd");
   return {
@@ -99,7 +68,7 @@ describe("ClientDetailContent", () => {
     repoMocks.getBatchById.mockResolvedValue({ ...batchFixture });
   });
 
-  it("opens batch modal", async () => {
+  it("navigates to the batch wizard", async () => {
     render(<ClientDetailContent clientId="client-123" />);
 
     await waitFor(() =>
@@ -109,70 +78,9 @@ describe("ClientDetailContent", () => {
       )
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /upload batch/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload new batch/i }));
 
-    expect(screen.getByTestId("batch-modal")).toBeInTheDocument();
-  });
-
-  it("creates batch and updates table", async () => {
-    repoMocks.createBatchForClient.mockResolvedValue({ ...batchFixture });
-
-    render(<ClientDetailContent clientId="client-123" />);
-
-    const uploadButton = await screen.findByRole("button", { name: /upload batch/i });
-    fireEvent.click(uploadButton);
-    fireEvent.change(screen.getByLabelText(/period/i), {
-      target: { value: "Jan 2025" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /submit batch/i }));
-
-    await waitFor(() =>
-      expect(repoMocks.createBatchForClient).toHaveBeenCalledWith("org-123", {
-        clientId: "client-123",
-        periodLabel: "Jan 2025",
-        notes: null,
-        totalFiles: 0,
-        processedFiles: 0,
-        status: "pending",
-      })
-    );
-
-    expect(auditMocks.logAuditEvent).toHaveBeenCalledWith({
-      organisationId: "org-123",
-      actorId: "profile-1",
-      action: "batch_created",
-      metadata: {
-        batchId: batchFixture.id,
-        clientId: "client-123",
-        periodLabel: "Jan 2025",
-      },
-    });
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(/jan 2025/i)
-      ).toBeInTheDocument()
-    );
-
-    expect(mockRouter.push).toHaveBeenCalledWith(`/batches/${batchFixture.id}`);
-  });
-
-  it("navigates to batch detail after creation", async () => {
-    repoMocks.createBatchForClient.mockResolvedValue({ ...batchFixture });
-    render(<ClientDetailContent clientId={clientFixture.id} />);
-
-    await screen.findByRole("button", { name: /upload batch/i });
-    fireEvent.click(screen.getByRole("button", { name: /upload batch/i }));
-    fireEvent.change(screen.getByLabelText(/period/i), {
-      target: { value: batchFixture.period_label },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /submit batch/i }));
-
-    await waitFor(() =>
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        `/batches/${batchFixture.id}`
-      )
-    );
+    expect(mockRouter.push).toHaveBeenCalledWith("/clients/client-123/batches/new");
   });
 
   it("opens an existing batch from the table", async () => {
@@ -187,5 +95,4 @@ describe("ClientDetailContent", () => {
     expect(mockRouter.push).toHaveBeenCalledWith(`/batches/${batchFixture.id}`);
   });
 });
-
 

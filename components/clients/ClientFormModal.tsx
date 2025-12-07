@@ -31,7 +31,10 @@ export function ClientFormModal({
 
   useEffect(() => {
     if (open) {
-      form.setFieldsValue(initialValues ?? {});
+      form.setFieldsValue({
+        payroll_system: "Unknown",
+        ...initialValues,
+      });
     } else {
       form.resetFields();
     }
@@ -84,11 +87,14 @@ export function ClientFormModal({
             }}
           />
         </Form.Item>
-        <Form.Item label="Payroll system" name="payroll_system">
+        <Form.Item
+          label="Payroll system"
+          name="payroll_system"
+          rules={[{ required: true, message: "Enter the payroll system (required)" }]}
+        >
           <Input placeholder="Eg. Sage" />
         </Form.Item>
       </Form>
     </Modal>
   );
 }
-

@@ -92,8 +92,13 @@ export async function createClient(
   input: ClientCreateInput
 ): Promise<ClientRow> {
   const supabase = getSupabaseBrowserClient();
+  const payrollSystem =
+    typeof input.payroll_system === "string" && input.payroll_system.trim().length
+      ? input.payroll_system.trim()
+      : "Unknown";
   const payload = sanitizePayload({
     ...input,
+    payroll_system: payrollSystem,
     organisation_id: organisationId,
   });
 
@@ -115,7 +120,13 @@ export async function updateClient(
   clientId: string,
   updates: ClientUpdateInput
 ): Promise<ClientRow> {
-  const sanitized = sanitizePayload(updates);
+  const sanitized = sanitizePayload({
+    ...updates,
+    payroll_system:
+      updates.payroll_system !== undefined
+        ? updates.payroll_system?.trim() || "Unknown"
+        : undefined,
+  });
   if (Object.keys(sanitized).length === 0) {
     throw new Error("No client fields were provided to update.");
   }
@@ -170,4 +181,3 @@ export async function getClientById(
 
   return (data ?? null) as ClientRow | null;
 }
-

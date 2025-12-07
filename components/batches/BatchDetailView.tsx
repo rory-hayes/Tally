@@ -306,11 +306,13 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     if (previous && previous !== derivedStatus) {
       if (derivedStatus === "completed") {
         notification.success({
+          title: "Batch processing completed",
           message: "Batch processing completed",
           description: `${batch.period_label ?? "Batch"} (${payDateLabel}) has finished processing.`,
         });
       } else if (derivedStatus === "failed") {
         notification.error({
+          title: "Batch processing finished with failures",
           message: "Batch processing finished with failures",
           description: "Review failed files below and retry once issues are fixed.",
         });

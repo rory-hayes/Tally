@@ -47,6 +47,13 @@ export type BatchDetail = {
     original_filename: string | null;
     parsed_status: string;
   }[];
+  reconciliationIssues?: {
+    id: string;
+    rule_code: string;
+    severity: IssueSeverity;
+    description: string;
+    data: Record<string, unknown> | null;
+  }[];
 };
 
 type PayslipRecord = {
@@ -214,6 +221,18 @@ export async function fetchBatchDetail(
     .eq("organisation_id", organisationId)
     .eq("batch_id", batchId);
 
+  const { data: reconciliationIssues, error: reconError } = await supabase
+    .from("issues")
+    .select("id, rule_code, severity, description, data")
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId)
+    .is("employee_id", null)
+    .eq("resolved", false);
+
+  if (reconError) {
+    throw new Error(`Failed to load reconciliation issues: ${reconError.message}`);
+  }
+
   const normalizedPayslips = payslips
     ? ((payslips as unknown as PayslipRecord[]).map((p) => ({
         ...p,
@@ -236,5 +255,13 @@ export async function fetchBatchDetail(
     },
     jobs,
     dataFiles: (dataFiles as { type: string; original_filename: string | null; parsed_status: string }[]) ?? [],
+    reconciliationIssues:
+      (reconciliationIssues as {
+        id: string;
+        rule_code: string;
+        severity: IssueSeverity;
+        description: string;
+        data: Record<string, unknown> | null;
+      }[]) ?? [],
   };
 }

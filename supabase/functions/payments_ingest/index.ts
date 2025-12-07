@@ -88,6 +88,20 @@ Deno.serve(async (req) => {
     });
   }
 
+  const headerLine = body.split(/\r?\n/).find((line) => line.trim().length > 0) ?? "";
+  const headers = headerLine
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  const required = ["employee_id", "amount"];
+  const missingHeaders = required.filter((col) => !headers.includes(col));
+  if (missingHeaders.length) {
+    return new Response(JSON.stringify({ error: `Missing required column(s): ${missingHeaders.join(", ")}` }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const parsedRows = parsePaymentCsv(body);
   const rows: PaymentRecord[] = parsedRows.map((row) => ({
     ...row,

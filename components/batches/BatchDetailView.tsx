@@ -82,6 +82,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const jobSummary =
     data?.jobs ?? { pending: 0, processing: 0, completed: 0, failed: 0, failedJobs: [] };
   const dataFiles = data?.dataFiles ?? [];
+  const reconciliationIssues = data?.reconciliationIssues ?? [];
 
   const draggerProps = useMemo(
     () => ({
@@ -487,6 +488,33 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             columns={columns}
             pagination={false}
           />
+        )}
+      </Card>
+
+      <Card title="Reconciliation checks">
+        {reconciliationIssues.length === 0 ? (
+          <Alert
+            type="success"
+            showIcon
+            message="No reconciliation issues detected"
+            description="Register, GL, bank, and submission totals match payslip data based on uploaded artefacts."
+          />
+        ) : (
+          <Space direction="vertical" style={{ width: "100%" }}>
+            {reconciliationIssues.map((issue) => (
+              <Alert
+                key={issue.id}
+                type={issue.severity === "critical" ? "error" : issue.severity === "warning" ? "warning" : "info"}
+                showIcon
+                message={issue.description}
+                description={
+                  issue.data ? (
+                    <Typography.Text type="secondary">{JSON.stringify(issue.data)}</Typography.Text>
+                  ) : null
+                }
+              />
+            ))}
+          </Space>
         )}
       </Card>
 

@@ -177,6 +177,22 @@ export function DataSourceUploader<TExtra extends Record<string, unknown> = Reco
         return;
       }
 
+      const text = await rcFile.text();
+      const headerLine = text.split(/\r?\n/).find((line) => line.trim().length > 0) ?? "";
+      const headers = headerLine
+        .split(",")
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean);
+      const missingHeaders = expectedColumns.filter(
+        (col) => !headers.includes(col.toLowerCase())
+      );
+      if (missingHeaders.length) {
+        const missingList = missingHeaders.join(", ");
+        message.error(`Missing required column(s): ${missingList}`);
+        setSubmitting(false);
+        return;
+      }
+
       await onSubmit({
         clientId,
         batchId,

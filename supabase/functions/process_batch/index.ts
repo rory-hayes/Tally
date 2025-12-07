@@ -17,6 +17,10 @@ import {
   buildIssuesForPayslip,
   type PayslipForRules,
 } from "./rules.ts";
+import { reconcileRegister } from "../../../lib/rules/registerReconciliation.ts";
+import { reconcileGlToPayslips } from "../../../lib/rules/glReconciliation.ts";
+import { reconcilePaymentsToPayslips } from "../../../lib/rules/paymentReconciliation.ts";
+import { reconcileSubmissionTotals } from "../../../lib/rules/submissionReconciliation.ts";
 import {
   getDefaultRuleConfig,
   mergeRuleConfig,
@@ -30,6 +34,19 @@ type JobRow = {
   batch_id: string;
   storage_path: string;
 };
+
+const RECONCILIATION_RULE_CODES = [
+  "REGISTER_PAYSPLIP_TOTAL_MISMATCH",
+  "MISSING_REGISTER_ENTRY",
+  "MISSING_PAYSLIP",
+  "GL_PAYROLL_TOTAL_MISMATCH",
+  "GL_EMPLOYER_TAX_MISMATCH",
+  "BANK_NETPAY_MISMATCH",
+  "BANK_PAYMENT_WITHOUT_PAYSLIP",
+  "PAYSLIP_WITHOUT_PAYMENT",
+  "SUBMISSION_TOTAL_MISMATCH",
+  "SUBMISSION_EMPLOYEE_COUNT_MISMATCH",
+];
 
 const SUPABASE_URL =
   Deno.env.get("PROJECT_URL") ??
@@ -187,7 +204,7 @@ async function handleJob(
     await insertInfoIssue(supabase, job, employeeId, normalized);
     await insertRuleIssues(supabase, currentPayslip, previousPayslip);
     await markJobStatus(supabase, job.id, true);
-    await refreshBatchProgress(supabase, job.batch_id);
+    await refreshBatchProgress(supabase, job.batch_id, job.organisation_id, job.client_id);
 
     console.log(`[process_batch] Job ${job.id} completed`);
     return { id: job.id, status: "completed" as const };
@@ -196,7 +213,7 @@ async function handleJob(
       err instanceof Error ? err.message : "Unknown processing error";
     console.error(`[process_batch] Job ${job.id} failed`, message);
     await markJobStatus(supabase, job.id, false, message);
-    await refreshBatchProgress(supabase, job.batch_id);
+    await refreshBatchProgress(supabase, job.batch_id, job.organisation_id, job.client_id);
     return { id: job.id, status: "failed" as const, error: message };
   }
 }
@@ -396,9 +413,116 @@ async function markJobStatus(
     .eq("id", jobId);
 }
 
+async function runBatchReconciliation(
+  supabase: ReturnType<typeof createClient>,
+  organisationId: string,
+  clientId: string,
+  batchId: string
+) {
+  const [{ data: payslips, error: payslipError }, { data: registerRows, error: registerError }] =
+    await Promise.all([
+      supabase
+        .from("payslips")
+        .select(
+          "id, employee_id, gross_pay, net_pay, paye, usc_or_ni, nic_employer, pension_employer"
+        )
+        .eq("organisation_id", organisationId)
+        .eq("client_id", clientId)
+        .eq("batch_id", batchId),
+      supabase
+        .from("payroll_register_entries")
+        .select("employee_id, entry_type, gross_pay, net_pay, paye, usc_or_ni")
+        .eq("organisation_id", organisationId)
+        .eq("client_id", clientId)
+        .eq("batch_id", batchId),
+    ]);
+
+  if (payslipError) throw new Error(`Reconciliation payslip fetch failed: ${payslipError.message}`);
+  if (registerError)
+    throw new Error(`Reconciliation register fetch failed: ${registerError.message}`);
+
+  const [{ data: glRow, error: glError }, { data: payments, error: paymentsError }] =
+    await Promise.all([
+      supabase
+        .from("gl_payroll_postings")
+        .select("wages, employer_taxes, pensions")
+        .eq("organisation_id", organisationId)
+        .eq("client_id", clientId)
+        .eq("batch_id", batchId)
+        .maybeSingle(),
+      supabase
+        .from("payment_records")
+        .select("employee_id, employee_ref, amount, currency, reference")
+        .eq("organisation_id", organisationId)
+        .eq("client_id", clientId)
+        .eq("batch_id", batchId),
+    ]);
+
+  if (glError) throw new Error(`Reconciliation GL fetch failed: ${glError.message}`);
+  if (paymentsError) throw new Error(`Reconciliation payments fetch failed: ${paymentsError.message}`);
+
+  const { data: rosSubmission } = await supabase
+    .from("ros_submission_summaries")
+    .select("paye_total, usc_or_ni_total, employee_count")
+    .eq("organisation_id", organisationId)
+    .eq("client_id", clientId)
+    .eq("batch_id", batchId)
+    .maybeSingle();
+
+  const { data: rtiSubmission } = await supabase
+    .from("rti_submission_summaries")
+    .select("paye_total, usc_or_ni_total, employee_count")
+    .eq("organisation_id", organisationId)
+    .eq("client_id", clientId)
+    .eq("batch_id", batchId)
+    .maybeSingle();
+
+  const submission = rosSubmission ?? rtiSubmission ?? null;
+
+  const issues = [
+    ...reconcileRegister(payslips ?? [], registerRows ?? []),
+    ...reconcileGlToPayslips(glRow ?? null, payslips ?? []),
+    ...reconcilePaymentsToPayslips(payments ?? [], payslips ?? []),
+    ...reconcileSubmissionTotals(submission, payslips ?? []),
+  ];
+
+  await supabase
+    .from("issues")
+    .delete()
+    .eq("organisation_id", organisationId)
+    .eq("client_id", clientId)
+    .eq("batch_id", batchId)
+    .in("rule_code", RECONCILIATION_RULE_CODES);
+
+  if (!issues.length) {
+    return;
+  }
+
+  const { error: insertError } = await supabase.from("issues").insert(
+    issues.map((issue) => ({
+      organisation_id: organisationId,
+      client_id: clientId,
+      batch_id: batchId,
+      employee_id: null,
+      payslip_id: null,
+      rule_code: issue.ruleCode,
+      severity: issue.severity,
+      description: issue.description,
+      data: issue.data ?? null,
+      note: null,
+    }))
+  );
+
+  if (insertError) {
+    throw new Error(`Failed to insert reconciliation issues: ${insertError.message}`);
+  }
+}
+
 async function refreshBatchProgress(
   supabase: ReturnType<typeof createClient>,
-  batchId: string
+  batchId: string,
+  organisationId: string,
+  clientId: string
 ) {
   const { data: jobs, error: jobsError } = await supabase
     .from("processing_jobs")
@@ -436,6 +560,14 @@ async function refreshBatchProgress(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (processed >= total && total > 0) {
+    try {
+      await runBatchReconciliation(supabase, organisationId, clientId, batchId);
+    } catch (reconError) {
+      console.error("[process_batch] Reconciliation failed", reconError);
+    }
   }
 }
 

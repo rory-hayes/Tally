@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Alert, Card, Empty, Spin, Table, Tag, Typography } from "antd";
+import { Alert, Card, Empty, Spin, Table, Tag, Typography, Space, Button } from "antd";
 import { useDashboardSummary } from "@/hooks/useDashboardSummary";
 import type { DashboardClientSummary } from "@/lib/repositories/dashboard";
 
@@ -48,6 +48,9 @@ const columns = [
 
 export function DashboardView() {
   const { status, data, error } = useDashboardSummary();
+  const needsOnboarding =
+    status === "success" &&
+    (data.length === 0 || data.every((client) => client.latestBatchPeriod === null));
 
   return (
     <div data-testid="dashboard-view">
@@ -55,6 +58,27 @@ export function DashboardView() {
       <Typography.Paragraph type="secondary">
         Track batches and issues across all clients.
       </Typography.Paragraph>
+      {needsOnboarding ? (
+        <Card style={{ marginBottom: 16 }}>
+          <Space direction="vertical" size="middle">
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              Getting started
+            </Typography.Title>
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+              Create your first client, upload a batch, and configure data sources to unlock rule packs.
+            </Typography.Paragraph>
+            <Space>
+              <Button type="primary" href="/clients">
+                Create a client
+              </Button>
+              <Button href="/clients">
+                Upload a batch
+              </Button>
+              <Button href="/data/register">Configure data sources</Button>
+            </Space>
+          </Space>
+        </Card>
+      ) : null}
       <Card variant="borderless">
         {status === "loading" && (
           <div style={{ textAlign: "center", padding: "2rem 0" }}>
@@ -87,4 +111,3 @@ export function DashboardView() {
     </div>
   );
 }
-

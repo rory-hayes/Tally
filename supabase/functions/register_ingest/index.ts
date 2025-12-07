@@ -29,13 +29,18 @@ type RegisterRow = {
   usc_or_ni: number | null;
 };
 
-const parseCsv = (csv: string): RegisterRow[] => {
+const parseCsv = (csv: string): { rows: RegisterRow[]; missing: string[] } => {
   const lines = csv
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  if (lines.length < 2) return [];
+  if (lines.length < 2) return { rows: [], missing: [] };
   const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const required = ["employee_id", "gross_pay", "net_pay", "paye"];
+  const missing = required.filter((col) => !headers.includes(col) && !headers.includes(col.replace("_", "")));
+  if (missing.length) {
+    return { rows: [], missing };
+  }
   const rows: RegisterRow[] = [];
   for (let i = 1; i < lines.length; i += 1) {
     const parts = lines[i].split(",");
@@ -53,7 +58,7 @@ const parseCsv = (csv: string): RegisterRow[] => {
       usc_or_ni: Number(record["usc_or_ni"] ?? 0),
     });
   }
-  return rows;
+  return { rows, missing: [] };
 };
 
 Deno.serve(async (req) => {
@@ -117,7 +122,15 @@ Deno.serve(async (req) => {
     });
   }
 
-  const rows = parseCsv(body);
+  const parsed = parseCsv(body);
+  if (parsed.missing.length) {
+    return new Response(JSON.stringify({ error: `Missing required column(s): ${parsed.missing.join(", ")}` }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const rows = parsed.rows;
   if (!rows.length) {
     return new Response(JSON.stringify({ error: "No register rows parsed" }), {
       status: 400,

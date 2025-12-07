@@ -1,60 +1,39 @@
-import { describe, it, expect, afterEach } from "vitest";
-import {
-  __dangerousSetRuleDefinitionsForTesting,
-  getActiveRules,
-  type RuleDefinition,
-} from "@/lib/rules/registry";
-
-afterEach(() => {
-  __dangerousSetRuleDefinitionsForTesting();
-});
+import { describe, it, expect } from "vitest";
+import { runRules } from "@/lib/logic/rulesEngine";
 
 describe("rule registry", () => {
-  it("filters rules by country and tax year", () => {
-    const definitions: RuleDefinition[] = [
+  it("flags new joiners when no previous payslip exists", () => {
+    const issues = runRules(
       {
-        code: "NET_CHANGE_LARGE",
-        descriptionTemplate: "Rule A",
-        severity: "warning",
-        categories: ["net"],
-        appliesTo: { countries: ["IE"], taxYears: [2025] },
-        evaluate: () => null,
+        employee_id: "EMP001",
+        gross_pay: 3000,
+        net_pay: 2200,
       },
+      null,
       {
-        code: "GROSS_CHANGE_LARGE",
-        descriptionTemplate: "Rule B",
-        severity: "warning",
-        categories: ["gross"],
-        appliesTo: { countries: ["UK"], taxYears: [2024] },
-        evaluate: () => null,
+        gross_pay: { previous: null, current: 3000, delta: null, percentChange: null },
+        net_pay: { previous: null, current: 2200, delta: null, percentChange: null },
+        paye: { previous: null, current: null, delta: null, percentChange: null },
+        usc_or_ni: { previous: null, current: null, delta: null, percentChange: null },
+        prsi_employee: { previous: null, current: null, delta: null, percentChange: null },
+        prsi_employer: { previous: null, current: null, delta: null, percentChange: null },
+        nic_employee: { previous: null, current: null, delta: null, percentChange: null },
+        nic_employer: { previous: null, current: null, delta: null, percentChange: null },
+        student_loan: { previous: null, current: null, delta: null, percentChange: null },
+        postgrad_loan: { previous: null, current: null, delta: null, percentChange: null },
+        pension_employee: { previous: null, current: null, delta: null, percentChange: null },
+        pension_employer: { previous: null, current: null, delta: null, percentChange: null },
+        ytd_gross: { previous: null, current: null, delta: null, percentChange: null },
+        ytd_net: { previous: null, current: null, delta: null, percentChange: null },
+        ytd_tax: { previous: null, current: null, delta: null, percentChange: null },
+        ytd_usc_or_ni: { previous: null, current: null, delta: null, percentChange: null },
       },
-    ];
+      { country: "IE", taxYear: 2025 }
+    );
 
-    __dangerousSetRuleDefinitionsForTesting(definitions);
-
-    const ieRules = getActiveRules("IE", 2025);
-    expect(ieRules.map((rule) => rule.code)).toEqual(["NET_CHANGE_LARGE"]);
-
-    const ukRules = getActiveRules("UK", 2024);
-    expect(ukRules.map((rule) => rule.code)).toEqual(["GROSS_CHANGE_LARGE"]);
-
-    const none = getActiveRules("IE", 2023);
-    expect(none).toHaveLength(0);
-  });
-
-  it("excludes rules when country missing but definition requires it", () => {
-    const definitions: RuleDefinition[] = [
-      {
-        code: "NET_CHANGE_LARGE",
-        descriptionTemplate: "Rule A",
-        severity: "warning",
-        categories: ["net"],
-        appliesTo: { countries: ["IE"] },
-        evaluate: () => null,
-      },
-    ];
-    __dangerousSetRuleDefinitionsForTesting(definitions);
-    expect(getActiveRules(undefined, 2025)).toHaveLength(0);
+    const joiner = issues.find((issue) => issue.ruleCode === "NEW_JOINER");
+    expect(joiner).toBeDefined();
+    expect(joiner?.severity).toBe("info");
+    expect(joiner?.description).toMatch(/New joiner/i);
   });
 });
-

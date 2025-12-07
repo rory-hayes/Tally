@@ -17,6 +17,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tabs,
   Typography,
   message,
 } from "antd";
@@ -32,6 +33,7 @@ import {
 import { getDefaultRuleConfig, mergeRuleConfig } from "@/lib/rules/config";
 import type { CountryCode, IssueSeverity, RuleCode, RuleConfig } from "@/lib/rules/types";
 import { goldenDataset, severityModel } from "@/lib/rules/goldenDataset";
+import { listRuleDefinitions } from "@/lib/rules/registry";
 
 const severityOptions: { label: string; value: IssueSeverity }[] = [
   { label: "Critical", value: "critical" },
@@ -108,6 +110,9 @@ function SettingsView() {
     () => clients.find((c) => c.id === selectedClientId) ?? null,
     [clients, selectedClientId]
   );
+
+  const watchedCountry = Form.useWatch("country", form) ?? selectedClient?.country ?? "IE";
+  const watchedTaxYear = Form.useWatch("taxYear", form) ?? new Date().getFullYear();
 
   const applyConfigToForm = (baseConfig: RuleConfig, overrides?: Partial<RuleConfig> | null) => {
     const merged = mergeRuleConfig(baseConfig, overrides ?? undefined);
@@ -218,218 +223,267 @@ function SettingsView() {
           Rules & Engine Configuration
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          Select a client, tune thresholds, pick rule packs, and manage golden datasets.
+          Select a client, tune thresholds, pick rule packs, and review active rules.
         </Typography.Paragraph>
       </div>
 
       {error ? <Alert type="error" message={error} showIcon /> : null}
 
-      <Card>
-        <Form form={form} layout="vertical" disabled={loadingClients || loadingConfig}>
-          <Row gutter={[16, 16]}>
-            <Col span={12}>
-              <Form.Item
-                label="Client"
-                required
-                validateStatus={selectedClient ? undefined : "error"}
-                help={!selectedClient ? "Pick a client to load/save settings" : undefined}
-              >
-                <Select
-                  placeholder="Select client"
-                  loading={loadingClients}
-                  options={clients.map((client) => ({
-                    label: `${client.name} (${client.country ?? "N/A"})`,
-                    value: client.id,
+      <Tabs
+        items={[
+          {
+            key: "config",
+            label: "Configuration",
+            children: (
+              <Card>
+                <Form form={form} layout="vertical" disabled={loadingClients || loadingConfig}>
+                  <Row gutter={[16, 16]}>
+                    <Col span={12}>
+                      <Form.Item
+                        label="Client"
+                        required
+                        validateStatus={selectedClient ? undefined : "error"}
+                        help={!selectedClient ? "Pick a client to load/save settings" : undefined}
+                      >
+                        <Select
+                          placeholder="Select client"
+                          loading={loadingClients}
+                          options={clients.map((client) => ({
+                            label: `${client.name} (${client.country ?? "N/A"})`,
+                            value: client.id,
+                          }))}
+                          value={selectedClientId ?? undefined}
+                          onChange={setSelectedClientId}
+                          showSearch
+                          optionFilterProp="label"
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Country" name="country" rules={[{ required: true, message: "Country required" }]}>
+                        <Select
+                          options={[
+                            { value: "IE", label: "Ireland" },
+                            { value: "UK", label: "United Kingdom" },
+                          ]}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Tax year" name="taxYear">
+                        <InputNumber style={{ width: "100%" }} min={2020} max={2100} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Form.Item label="Rule packs" name="enabledRulePacks">
+                    <Select
+                      mode="multiple"
+                      options={[
+                        { value: "core-tax", label: "Core tax rules (IE/UK)" },
+                        { value: "reconciliation", label: "Reconciliation (register/GL/bank/submissions)" },
+                        { value: "contract-compliance", label: "Contract compliance" },
+                      ]}
+                      placeholder="Select packs to run"
+                    />
+                  </Form.Item>
+
+                  <Divider />
+                  <Typography.Title level={5}>Thresholds & tolerances</Typography.Title>
+                  <Row gutter={[16, 16]}>
+                    <Col span={6}>
+                      <Form.Item label="Large net change %" name="largeNetChangePercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Large gross change %" name="largeGrossChangePercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="PAYE spike %" name="payeSpikePercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={200} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="USC/NI spike %" name="uscSpikePercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={200} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Max gross delta %" name="maxGrossDeltaPercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item
+                        label="Max gross delta for USC %"
+                        name="maxGrossDeltaForUscPercent"
+                        rules={[{ required: true }]}
+                      >
+                        <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Pension EE threshold %" name="pensionEmployeePercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Pension ER threshold %" name="pensionEmployerPercent" rules={[{ required: true }]}>
+                        <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Divider />
+                  <Typography.Title level={5}>Severity overrides</Typography.Title>
+                  <Row gutter={[12, 12]}>
+                    {overrideableRules.map((rule) => (
+                      <Col span={8} key={rule.code}>
+                        <Form.Item label={rule.label} name={["severityOverrides", rule.code]}>
+                          <Select allowClear options={severityOptions} placeholder={severityModel[rule.code] ?? "Default"} />
+                        </Form.Item>
+                      </Col>
+                    ))}
+                  </Row>
+
+                  <Divider />
+                  <Typography.Title level={5}>Enrichment options</Typography.Title>
+                  <Row gutter={[12, 12]}>
+                    <Col span={8}>
+                      <Form.Item label="Include expected vs actual" name={["enrichment", "includeEvidence"]} valuePropName="checked">
+                        <Switch />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        label="Include band breakdowns"
+                        name={["enrichment", "includeBandBreakdown"]}
+                        valuePropName="checked"
+                      >
+                        <Switch />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        label="Include golden context"
+                        name={["enrichment", "includeGoldenContext"]}
+                        valuePropName="checked"
+                      >
+                        <Switch />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Divider />
+                  <Typography.Title level={5}>Golden dataset & severity model</Typography.Title>
+                  <Form.Item
+                    name="goldenDatasetText"
+                    help="Paste JSON describing golden test cases. Saved with the client rule config."
+                  >
+                    <Input.TextArea rows={8} spellCheck={false} />
+                  </Form.Item>
+
+                  <Collapse>
+                    <Collapse.Panel header="Preview severity model" key="severity">
+                      <Table
+                        size="small"
+                        pagination={false}
+                        rowKey="rule"
+                        dataSource={Object.entries(severityModel).map(([rule, severity]) => ({
+                          rule,
+                          severity,
+                        }))}
+                        columns={[
+                          { title: "Rule", dataIndex: "rule" },
+                          {
+                            title: "Severity",
+                            dataIndex: "severity",
+                            render: (value: string) => <Tag color={value === "critical" ? "red" : value === "warning" ? "orange" : "blue"}>{value}</Tag>,
+                          },
+                        ]}
+                      />
+                    </Collapse.Panel>
+                    <Collapse.Panel header="Preview golden cases" key="golden">
+                      <Table
+                        size="small"
+                        pagination={false}
+                        rowKey="id"
+                        dataSource={goldenDataset}
+                        columns={[
+                          { title: "ID", dataIndex: "id" },
+                          { title: "Country", dataIndex: "country" },
+                          { title: "Tax year", dataIndex: "taxYear" },
+                          { title: "Description", dataIndex: "description" },
+                          {
+                            title: "Expected issues",
+                            dataIndex: "expectedIssues",
+                            render: (issues) =>
+                              (issues as { ruleCode: RuleCode; severity: IssueSeverity }[]).map((issue) => (
+                                <Tag key={issue.ruleCode} color={issue.severity === "critical" ? "red" : issue.severity === "warning" ? "orange" : "blue"}>
+                                  {issue.ruleCode}
+                                </Tag>
+                              )),
+                          },
+                        ]}
+                      />
+                    </Collapse.Panel>
+                  </Collapse>
+
+                  <Divider />
+                  <Space>
+                    <Button onClick={handleReset}>Reset to defaults</Button>
+                    <Button type="primary" onClick={handleSave} loading={loadingConfig}>
+                      Save configuration
+                    </Button>
+                  </Space>
+                </Form>
+              </Card>
+            ),
+          },
+          {
+            key: "rules",
+            label: "Rule list",
+            children: (
+              <Card>
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                  Active rules ({listRuleDefinitions(watchedCountry as CountryCode, watchedTaxYear).length})
+                </Typography.Title>
+                <Typography.Paragraph type="secondary">
+                  Showing rules for {watchedCountry} {watchedTaxYear || ""}. Update country/tax year above to preview coverage.
+                </Typography.Paragraph>
+                <Table
+                  size="small"
+                  rowKey="code"
+                  pagination={{ pageSize: 10 }}
+                  dataSource={listRuleDefinitions(watchedCountry as CountryCode, watchedTaxYear).map((rule) => ({
+                    code: rule.code,
+                    description: rule.descriptionTemplate,
+                    severity: rule.severity,
+                    categories: rule.categories.join(", "),
+                    countries: rule.appliesTo?.countries?.join(", ") ?? "IE & UK",
                   }))}
-                  value={selectedClientId ?? undefined}
-                  onChange={setSelectedClientId}
-                  showSearch
-                  optionFilterProp="label"
-                />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Country" name="country" rules={[{ required: true, message: "Country required" }]}>
-                <Select
-                  options={[
-                    { value: "IE", label: "Ireland" },
-                    { value: "UK", label: "United Kingdom" },
+                  columns={[
+                    { title: "Code", dataIndex: "code" },
+                    { title: "Description", dataIndex: "description" },
+                    { title: "Categories", dataIndex: "categories" },
+                    { title: "Countries", dataIndex: "countries" },
+                    {
+                      title: "Severity",
+                      dataIndex: "severity",
+                      render: (value: string) => (
+                        <Tag color={value === "critical" ? "red" : value === "warning" ? "orange" : "blue"}>{value}</Tag>
+                      ),
+                    },
                   ]}
                 />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Tax year" name="taxYear">
-                <InputNumber style={{ width: "100%" }} min={2020} max={2100} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item label="Rule packs" name="enabledRulePacks">
-            <Select
-              mode="multiple"
-              options={[
-                { value: "core-tax", label: "Core tax rules (IE/UK)" },
-                { value: "reconciliation", label: "Reconciliation (register/GL/bank/submissions)" },
-                { value: "contract-compliance", label: "Contract compliance" },
-              ]}
-              placeholder="Select packs to run"
-            />
-          </Form.Item>
-
-          <Divider />
-          <Typography.Title level={5}>Thresholds & tolerances</Typography.Title>
-          <Row gutter={[16, 16]}>
-            <Col span={6}>
-              <Form.Item label="Large net change %" name="largeNetChangePercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Large gross change %" name="largeGrossChangePercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="PAYE spike %" name="payeSpikePercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={200} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="USC/NI spike %" name="uscSpikePercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={200} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Max gross delta %" name="maxGrossDeltaPercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label="Max gross delta for USC %"
-                name="maxGrossDeltaForUscPercent"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Pension EE threshold %" name="pensionEmployeePercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Pension ER threshold %" name="pensionEmployerPercent" rules={[{ required: true }]}>
-                <InputNumber min={0} max={100} addonAfter="%" style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider />
-          <Typography.Title level={5}>Severity overrides</Typography.Title>
-          <Row gutter={[12, 12]}>
-            {overrideableRules.map((rule) => (
-              <Col span={8} key={rule.code}>
-                <Form.Item label={rule.label} name={["severityOverrides", rule.code]}>
-                  <Select allowClear options={severityOptions} placeholder={severityModel[rule.code] ?? "Default"} />
-                </Form.Item>
-              </Col>
-            ))}
-          </Row>
-
-          <Divider />
-          <Typography.Title level={5}>Enrichment options</Typography.Title>
-          <Row gutter={[12, 12]}>
-            <Col span={8}>
-              <Form.Item label="Include expected vs actual" name={["enrichment", "includeEvidence"]} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="Include band breakdowns"
-                name={["enrichment", "includeBandBreakdown"]}
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="Include golden context"
-                name={["enrichment", "includeGoldenContext"]}
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider />
-          <Typography.Title level={5}>Golden dataset & severity model</Typography.Title>
-          <Form.Item
-            name="goldenDatasetText"
-            help="Paste JSON describing golden test cases. Saved with the client rule config."
-          >
-            <Input.TextArea rows={8} spellCheck={false} />
-          </Form.Item>
-
-          <Collapse>
-            <Collapse.Panel header="Preview severity model" key="severity">
-              <Table
-                size="small"
-                pagination={false}
-                rowKey="rule"
-                dataSource={Object.entries(severityModel).map(([rule, severity]) => ({
-                  rule,
-                  severity,
-                }))}
-                columns={[
-                  { title: "Rule", dataIndex: "rule" },
-                  {
-                    title: "Severity",
-                    dataIndex: "severity",
-                    render: (value: string) => <Tag color={value === "critical" ? "red" : value === "warning" ? "orange" : "blue"}>{value}</Tag>,
-                  },
-                ]}
-              />
-            </Collapse.Panel>
-            <Collapse.Panel header="Preview golden cases" key="golden">
-              <Table
-                size="small"
-                pagination={false}
-                rowKey="id"
-                dataSource={goldenDataset}
-                columns={[
-                  { title: "ID", dataIndex: "id" },
-                  { title: "Country", dataIndex: "country" },
-                  { title: "Tax year", dataIndex: "taxYear" },
-                  { title: "Description", dataIndex: "description" },
-                  {
-                    title: "Expected issues",
-                    dataIndex: "expectedIssues",
-                    render: (issues) =>
-                      (issues as { ruleCode: RuleCode; severity: IssueSeverity }[]).map((issue) => (
-                        <Tag key={issue.ruleCode} color={issue.severity === "critical" ? "red" : issue.severity === "warning" ? "orange" : "blue"}>
-                          {issue.ruleCode}
-                        </Tag>
-                      )),
-                  },
-                ]}
-              />
-            </Collapse.Panel>
-          </Collapse>
-
-          <Divider />
-          <Space>
-            <Button onClick={handleReset}>Reset to defaults</Button>
-            <Button type="primary" onClick={handleSave} loading={loadingConfig}>
-              Save configuration
-            </Button>
-          </Space>
-        </Form>
-      </Card>
+              </Card>
+            ),
+          },
+        ]}
+      />
     </Space>
   );
 }

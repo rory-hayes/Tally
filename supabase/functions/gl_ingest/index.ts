@@ -33,15 +33,20 @@ const parseNumber = (value: string | undefined) => {
   return Number.isFinite(num) ? num : 0;
 };
 
-const parseCsv = (csv: string): GlRow => {
+const parseCsv = (csv: string): { totals: GlRow; missing: string[] } => {
   const lines = csv
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   if (lines.length < 2) {
-    return { wages: 0, employer_taxes: 0, pensions: 0, other: 0, currency: null };
+    return {
+      totals: { wages: 0, employer_taxes: 0, pensions: 0, other: 0, currency: null },
+      missing: [],
+    };
   }
   const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const required = ["wages", "employer_taxes", "pensions"];
+  const missing = required.filter((col) => !headers.includes(col));
   const totals: GlRow = { wages: 0, employer_taxes: 0, pensions: 0, other: 0, currency: null };
   for (let i = 1; i < lines.length; i += 1) {
     const parts = lines[i].split(",");
@@ -55,7 +60,7 @@ const parseCsv = (csv: string): GlRow => {
     totals.other += parseNumber(record["other"]);
     totals.currency = totals.currency ?? record["currency"] ?? null;
   }
-  return totals;
+  return { totals, missing };
 };
 
 Deno.serve(async (req) => {
@@ -119,7 +124,15 @@ Deno.serve(async (req) => {
     });
   }
 
-  const totals = parseCsv(body);
+  const parsed = parseCsv(body);
+  if (parsed.missing.length) {
+    return new Response(JSON.stringify({ error: `Missing required column(s): ${parsed.missing.join(", ")}` }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const totals = parsed.totals;
 
   const { error: insertError } = await supabase
     .from("gl_payroll_postings")

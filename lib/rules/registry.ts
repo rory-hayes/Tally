@@ -100,6 +100,20 @@ const buildSpikeData = (
 
 const baseRuleDefinitions: RuleDefinition[] = [
   {
+    code: "NEW_JOINER",
+    descriptionTemplate: "New joiner with no prior payslip",
+    severity: "info",
+    categories: ["compliance"],
+    appliesTo: { countries: COUNTRY_ALL },
+    evaluate: ({ previous, current }) => {
+      if (!previous) {
+        const label = current.employee_id ?? current.id ?? "Employee";
+        return applyIssue(`New joiner: no previous payslip for ${label}`);
+      }
+      return null;
+    },
+  },
+  {
     code: "NET_CHANGE_LARGE",
     descriptionTemplate: "Net pay changed significantly",
     severity: "warning",
@@ -655,5 +669,10 @@ export const getActiveRules = (
 export const __dangerousSetRuleDefinitionsForTesting = (definitions?: RuleDefinition[]) => {
   activeDefinitions = definitions && definitions.length ? definitions : [...baseRuleDefinitions];
 };
+
+export const listRuleDefinitions = (
+  country?: CountryCode,
+  taxYear?: number | null
+): RuleDefinition[] => getActiveRules(country, taxYear);
 
 export const __getAllRuleDefinitions = () => [...activeDefinitions];

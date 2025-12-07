@@ -32,7 +32,8 @@ export type RuleCode =
   | "BANK_PAYMENT_WITHOUT_PAYSLIP"
   | "PAYSLIP_WITHOUT_PAYMENT"
   | "SUBMISSION_TOTAL_MISMATCH"
-  | "SUBMISSION_EMPLOYEE_COUNT_MISMATCH";
+  | "SUBMISSION_EMPLOYEE_COUNT_MISMATCH"
+  | "NEW_JOINER";
 
 export type IssueDataPayload = Record<string, unknown>;
 

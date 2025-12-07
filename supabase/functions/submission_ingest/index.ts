@@ -30,19 +30,27 @@ const parseCsv = (csv: string) => {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  if (lines.length < 2) return null;
+  if (lines.length < 2) return { record: null, missing: [] };
   const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const required = ["paye_total", "usc_or_ni_total", "employee_count"];
+  const missing = required.filter((col) => !headers.includes(col));
+  if (missing.length) {
+    return { record: null, missing };
+  }
   const parts = lines[1].split(",");
   const record: Record<string, string> = {};
   headers.forEach((header, idx) => {
     record[header] = parts[idx] ?? "";
   });
   return {
-    paye_total: parseNumber(record["paye_total"] ?? record["paye"]),
-    usc_or_ni_total: parseNumber(record["usc_or_ni_total"] ?? record["usc"] ?? record["ni"]),
-    employee_count: Number(record["employee_count"] ?? 0),
-    tax_year: record["tax_year"] ? Number(record["tax_year"]) : null,
-    source_file: record["source_file"] ?? null,
+    missing: [],
+    record: {
+      paye_total: parseNumber(record["paye_total"] ?? record["paye"]),
+      usc_or_ni_total: parseNumber(record["usc_or_ni_total"] ?? record["usc"] ?? record["ni"]),
+      employee_count: Number(record["employee_count"] ?? 0),
+      tax_year: record["tax_year"] ? Number(record["tax_year"]) : null,
+      source_file: record["source_file"] ?? null,
+    },
   };
 };
 
@@ -109,7 +117,13 @@ Deno.serve(async (req) => {
   }
 
   const parsed = parseCsv(body);
-  if (!parsed) {
+  if (parsed.missing.length) {
+    return new Response(JSON.stringify({ error: `Missing required column(s): ${parsed.missing.join(", ")}` }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (!parsed.record) {
     return new Response(JSON.stringify({ error: "No submission row parsed" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -122,7 +136,7 @@ Deno.serve(async (req) => {
     .from(targetTable)
     .upsert(
       {
-        ...parsed,
+        ...parsed.record,
         organisation_id: profile.organisation_id,
         client_id: clientId,
         batch_id: batchId,

@@ -302,6 +302,17 @@ export const derivePayDateFromBatch = (
   return null;
 };
 
+export const resolvePayDate = (
+  batchPayDate: string | null,
+  normalizedPayDate: string | null,
+  periodLabel?: string | null,
+  createdAt?: string | null
+) => {
+  if (batchPayDate) return batchPayDate;
+  if (normalizedPayDate) return normalizedPayDate;
+  return derivePayDateFromBatch(periodLabel, createdAt);
+};
+
 export const buildPayslipInsert = (
   job: PayslipJob,
   employeeId: string,
@@ -332,4 +343,3 @@ export const listMissingFields = (
   normalized: NormalizedTextractResult
 ): NumericField[] =>
   NUMERIC_FIELDS.filter((field) => normalized[field] === null);
-

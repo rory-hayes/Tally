@@ -67,7 +67,7 @@ const columns = (
         </Button>
         <Popconfirm
           title="Delete client"
-          description={`Remove ${record.name}?`}
+          description={`Remove ${record.name} and all associated batches? This cannot be undone.`}
           onConfirm={() => onDelete(record)}
           okText="Delete"
           okButtonProps={{ danger: true }}
@@ -108,5 +108,4 @@ export function ClientsTable({
     />
   );
 }
-
 

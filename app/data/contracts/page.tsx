@@ -65,6 +65,17 @@ function ContractsIntegrationView() {
         "effective_to",
       ]}
       sampleCsv={sampleCsv}
+      sampleFilename="contracts_template.csv"
+      helperText="Import from your HR/payroll system to avoid manual entry. These values are displayed in employee detail pages and feed contract compliance rules."
+      fieldHelp={[
+        { name: "employee_id", description: "Employee reference matching payslips." },
+        { name: "salary_amount", description: "Salary amount for salaried staff." },
+        { name: "salary_period", description: "Salary cadence (annual/monthly/weekly/daily/hourly)." },
+        { name: "hourly_rate", description: "Hourly rate for hourly staff." },
+        { name: "standard_hours_per_week", description: "Contracted weekly hours." },
+        { name: "effective_from", description: "Date the contract terms start (YYYY-MM-DD)." },
+        { name: "effective_to", description: "Date the contract terms end (optional)." },
+      ]}
       requireBatch={false}
       actionLabel="Upload contract data"
       onSubmit={handleUpload}

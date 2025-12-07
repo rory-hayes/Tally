@@ -20,7 +20,8 @@ export type UploadedBatchFile = {
 
 export async function uploadBatchFiles(
   batchId: string,
-  files: File[]
+  files: File[],
+  onProgress?: (uploaded: number, total: number) => void
 ): Promise<UploadedBatchFile[]> {
   if (!files.length) {
     return [];
@@ -34,6 +35,7 @@ export async function uploadBatchFiles(
   const storage = supabase.storage.from(BUCKET);
 
   const uploadedPaths: UploadedBatchFile[] = [];
+  let uploadedCount = 0;
 
   for (const file of files) {
     const path = generateObjectPath(batchId, file.name);
@@ -48,8 +50,9 @@ export async function uploadBatchFiles(
     }
 
     uploadedPaths.push({ path, originalName: file.name });
+    uploadedCount += 1;
+    onProgress?.(uploadedCount, files.length);
   }
 
   return uploadedPaths;
 }
-

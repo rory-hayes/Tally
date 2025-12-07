@@ -13,6 +13,7 @@ import {
   Button,
   message,
   Popconfirm,
+  Progress,
   Tabs,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -43,6 +44,19 @@ function useBatchColumns(
         key: "period_label",
       },
       {
+        title: "Pay date",
+        dataIndex: "pay_date",
+        key: "pay_date",
+        render: (value: string | null) =>
+          value
+            ? new Date(value).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })
+            : "—",
+      },
+      {
         title: "Status",
         dataIndex: "status",
         key: "status",
@@ -53,8 +67,29 @@ function useBatchColumns(
       {
         title: "Files processed",
         key: "files",
-        render: (_value, record) =>
-          `${record.processed_files}/${record.total_files}`,
+        render: (_value, record) => {
+          const processed = record.processed_files ?? 0;
+          const total = record.total_files ?? 0;
+          const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+          return (
+            <Space direction="vertical" size={0}>
+              <Progress
+                percent={percent}
+                size="small"
+                status={
+                  record.status === "failed"
+                    ? "exception"
+                    : record.status === "completed"
+                    ? "success"
+                    : "active"
+                }
+              />
+              <Typography.Text type="secondary">
+                {processed}/{total} files
+              </Typography.Text>
+            </Space>
+          );
+        },
       },
       {
         title: "Employees",
@@ -75,6 +110,7 @@ function useBatchColumns(
             </Button>
             <Popconfirm
               title="Delete this batch?"
+              description="This removes payslips, issues, and attachments for the batch."
               okText="Delete"
               cancelText="Cancel"
               onConfirm={() => onDeleteBatch(record)}

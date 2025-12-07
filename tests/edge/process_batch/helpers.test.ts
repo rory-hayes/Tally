@@ -5,6 +5,7 @@ import {
   ensureNormalizedHasContent,
   listMissingFields,
   normalizeTextractResponse,
+  resolvePayDate,
 } from "@/supabase/functions/process_batch/helpers";
 
 const sampleResponse = {
@@ -116,6 +117,23 @@ describe("derivePayDateFromBatch", () => {
   });
 });
 
+describe("resolvePayDate", () => {
+  it("prefers the batch pay date when provided", () => {
+    const date = resolvePayDate("2025-02-28", "2025-02-15", "Feb 2025", "2025-02-02T12:00:00Z");
+    expect(date).toBe("2025-02-28");
+  });
+
+  it("uses normalized pay date when batch value missing", () => {
+    const date = resolvePayDate(null, "2025-02-15", "Feb 2025", "2025-02-02T12:00:00Z");
+    expect(date).toBe("2025-02-15");
+  });
+
+  it("falls back to derived date when nothing else is present", () => {
+    const date = resolvePayDate(null, null, "Feb 2025", "2025-02-02T12:00:00Z");
+    expect(date).toBe("2025-02-01");
+  });
+});
+
 describe("ensureNormalizedHasContent", () => {
   it("does nothing when raw_text contains content", () => {
     const normalized = normalizeTextractResponse(sampleResponse as any);
@@ -129,4 +147,3 @@ describe("ensureNormalizedHasContent", () => {
     );
   });
 });
-

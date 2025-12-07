@@ -37,6 +37,15 @@ function RegisterIntegrationView() {
         "usc_or_ni",
       ]}
       sampleCsv={sampleCsv}
+      sampleFilename="payroll_register_template.csv"
+      helperText="Use the client's mapping config from Clients → Data sources to align headers. This feed powers gross/net reconciliation rules in the architecture."
+      fieldHelp={[
+        { name: "employee_id", description: "External employee identifier that matches payslip filenames or references." },
+        { name: "gross_pay", description: "Gross pay for the period from the register export." },
+        { name: "net_pay", description: "Net pay for the period." },
+        { name: "paye", description: "PAYE or income tax deducted for the period." },
+        { name: "usc_or_ni", description: "USC (IE) or NI (UK) deducted for the period." },
+      ]}
       onSubmit={handleUpload}
       actionLabel="Upload register"
     />

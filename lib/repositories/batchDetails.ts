@@ -9,6 +9,7 @@ export type BatchMeta = {
   organisation_id: string;
   client_id: string;
   period_label: string;
+  pay_date?: string | null;
   status: string;
   total_files: number;
   processed_files: number;
@@ -153,7 +154,7 @@ export async function fetchBatchDetail(
   const { data: batchRow, error: batchError } = await supabase
     .from("batches")
     .select(
-      "id, organisation_id, client_id, period_label, status, total_files, processed_files, created_at"
+      "id, organisation_id, client_id, period_label, pay_date, status, total_files, processed_files, created_at"
     )
     .eq("organisation_id", organisationId)
     .eq("id", batchId)

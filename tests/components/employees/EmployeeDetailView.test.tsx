@@ -20,6 +20,8 @@ const sampleComparison = {
   clientId: "client-1",
   currentBatchPeriodLabel: "February 2025",
   previousBatchPeriodLabel: "January 2025",
+  currentBatchPayDate: "2025-02-28",
+  previousBatchPayDate: "2025-01-31",
   currentPayslip: { id: "cur", net_pay: 2100, gross_pay: 3200, pay_date: "2025-02-28" },
   previousPayslip: { id: "prev", net_pay: 2000, gross_pay: 3000, pay_date: "2025-01-31" },
   diff: {
@@ -144,6 +146,7 @@ describe("EmployeeDetailView", () => {
     const comparison = {
       ...sampleComparison,
       currentPayslip: { ...sampleComparison.currentPayslip, pay_date: null },
+      currentBatchPayDate: null,
       currentBatchPeriodLabel: "March 2025",
     };
     mockUseEmployeeComparison.mockReturnValueOnce({
@@ -155,5 +158,20 @@ describe("EmployeeDetailView", () => {
     render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
     expect(screen.getByText(/March 2025/)).toBeInTheDocument();
   });
-});
 
+  it("uses batch pay date when payslip pay date is absent", () => {
+    const comparison = {
+      ...sampleComparison,
+      currentPayslip: { ...sampleComparison.currentPayslip, pay_date: null },
+      currentBatchPayDate: "2025-02-25",
+    };
+    mockUseEmployeeComparison.mockReturnValueOnce({
+      status: "success",
+      data: comparison,
+      error: null,
+      toggleIssue: vi.fn(),
+    });
+    render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
+    expect(screen.getByText(/February 25, 2025/)).toBeInTheDocument();
+  });
+});

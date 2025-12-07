@@ -168,6 +168,12 @@ export function ClientDataSourcesTab({
           Configure client-specific mappings for payroll register, GL, bank files, and statutory exports.
         </Typography.Paragraph>
       </div>
+      <Alert
+        type="info"
+        showIcon
+        message="Save mapping JSON once per client"
+        description="Match the exact column headers from your exports (employee IDs, pay dates, gross/net amounts). These mappings drive the batch wizard upload validation and keep parsing deterministic."
+      />
       {error ? <Alert type="error" message={error} showIcon /> : null}
       <Card>
         <Table<ClientDataSource>
@@ -210,6 +216,9 @@ export function ClientDataSourcesTab({
 }`}
             />
           </Form.Item>
+          <Typography.Paragraph type="secondary">
+            Include header names and formats, e.g. {`{ "employeeIdColumn": "employee_id", "dateFormat": "DD/MM/YYYY" }`}. See Clients → Data sources uploads for sample CSVs.
+          </Typography.Paragraph>
           <Alert
             type="info"
             showIcon

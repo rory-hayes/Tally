@@ -302,7 +302,11 @@ describe("BatchDetailView", () => {
     fireEvent.click(screen.getByRole("button", { name: /upload files/i }));
 
     await waitFor(() =>
-      expect(uploadBatchFilesMock).toHaveBeenCalledWith("batch-1", expect.any(Array))
+      expect(uploadBatchFilesMock).toHaveBeenCalledWith(
+        "batch-1",
+        expect.any(Array),
+        expect.any(Function)
+      )
     );
     expect(logAuditMock).toHaveBeenCalledWith({
       organisationId: "org-123",

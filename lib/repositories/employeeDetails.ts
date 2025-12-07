@@ -24,6 +24,8 @@ export type EmployeeComparison = {
   clientId: string;
   currentBatchPeriodLabel: string | null;
   previousBatchPeriodLabel: string | null;
+  currentBatchPayDate: string | null;
+  previousBatchPayDate: string | null;
   currentPayslip: PayslipLike & { id: string; pay_date?: string | null };
   previousPayslip: (PayslipLike & { id: string; pay_date?: string | null }) | null;
   diff: PayslipDiff;
@@ -131,11 +133,11 @@ export async function fetchEmployeeComparison(args: {
       )
     )
   );
-  const batchPeriodMap = new Map<string, string | null>();
+  const batchMetadata = new Map<string, { period_label: string | null; pay_date: string | null }>();
   if (batchIds.length > 0) {
     const { data: batchRows, error: batchLookupError } = await supabase
       .from("batches")
-      .select("id, period_label")
+      .select("id, period_label, pay_date")
       .in("id", batchIds);
 
     if (batchLookupError) {
@@ -143,7 +145,10 @@ export async function fetchEmployeeComparison(args: {
     }
 
     batchRows?.forEach((row) => {
-      batchPeriodMap.set(row.id, row.period_label ?? null);
+      batchMetadata.set(row.id, {
+        period_label: row.period_label ?? null,
+        pay_date: row.pay_date ?? null,
+      });
     });
   }
 
@@ -177,9 +182,13 @@ export async function fetchEmployeeComparison(args: {
     employeeRef,
     batchId,
     clientId: currentPayslip.client_id,
-    currentBatchPeriodLabel: batchPeriodMap.get(currentPayslip.batch_id) ?? null,
+    currentBatchPeriodLabel: batchMetadata.get(currentPayslip.batch_id)?.period_label ?? null,
+    currentBatchPayDate: batchMetadata.get(currentPayslip.batch_id)?.pay_date ?? null,
     previousBatchPeriodLabel: previousPayslip?.batch_id
-      ? batchPeriodMap.get(previousPayslip.batch_id) ?? null
+      ? batchMetadata.get(previousPayslip.batch_id)?.period_label ?? null
+      : null,
+    previousBatchPayDate: previousPayslip?.batch_id
+      ? batchMetadata.get(previousPayslip.batch_id)?.pay_date ?? null
       : null,
     currentPayslip,
     previousPayslip,

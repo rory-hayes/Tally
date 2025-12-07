@@ -18,6 +18,16 @@ import { useOrganisation } from "@/context/OrganisationContext";
 import { getClientsForOrg, type ClientRow } from "@/lib/repositories/clients";
 import { getBatchesForClient, type BatchRow } from "@/lib/repositories/batches";
 
+const downloadSample = (csv: string, filename: string) => {
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 type DataSourceUploaderProps<TExtra extends Record<string, unknown> = Record<string, unknown>> = {
   title: string;
   description: string;
@@ -29,6 +39,9 @@ type DataSourceUploaderProps<TExtra extends Record<string, unknown> = Record<str
   defaultCountry?: string;
   actionLabel?: string;
   extraFieldsRender?: (form: ReturnType<typeof Form.useForm>[0]) => React.ReactNode;
+  helperText?: string;
+  fieldHelp?: { name: string; description: string }[];
+  sampleFilename?: string;
   onSubmit: (input: {
     clientId: string;
     batchId?: string;
@@ -52,6 +65,9 @@ export function DataSourceUploader<TExtra extends Record<string, unknown> = Reco
   defaultCountry,
   actionLabel = "Upload",
   extraFieldsRender,
+  helperText,
+  fieldHelp,
+  sampleFilename = "sample.csv",
   onSubmit,
 }: DataSourceUploaderProps<TExtra>) {
   const { organisationId } = useOrganisation();
@@ -183,6 +199,14 @@ export function DataSourceUploader<TExtra extends Record<string, unknown> = Reco
     <Card title={title}>
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
         <Typography.Paragraph>{description}</Typography.Paragraph>
+        {helperText ? (
+          <Alert
+            showIcon
+            type="info"
+            message={helperText}
+            style={{ marginBottom: 8 }}
+          />
+        ) : null}
         <Form
           layout="vertical"
           form={form}
@@ -273,7 +297,14 @@ export function DataSourceUploader<TExtra extends Record<string, unknown> = Reco
         {error ? <Alert type="error" showIcon message={error} /> : null}
 
         <Divider />
-        <Typography.Title level={5}>Template</Typography.Title>
+        <Space align="center" size="middle">
+          <Typography.Title level={5} style={{ marginBottom: 0 }}>
+            Template
+          </Typography.Title>
+          <Button size="small" onClick={() => downloadSample(sampleCsv, sampleFilename)}>
+            Download CSV
+          </Button>
+        </Space>
         <Typography.Paragraph type="secondary">
           Copy this sample CSV to get started.
         </Typography.Paragraph>
@@ -288,6 +319,21 @@ export function DataSourceUploader<TExtra extends Record<string, unknown> = Reco
         >
           {sampleCsv}
         </pre>
+        {fieldHelp?.length ? (
+          <Space direction="vertical" size="small">
+            <Typography.Title level={5} style={{ marginBottom: 0 }}>
+              Field definitions
+            </Typography.Title>
+            <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
+              {fieldHelp.map((field) => (
+                <li key={field.name}>
+                  <Typography.Text strong>{field.name}</Typography.Text>:{" "}
+                  <Typography.Text type="secondary">{field.description}</Typography.Text>
+                </li>
+              ))}
+            </ul>
+          </Space>
+        ) : null}
       </Space>
     </Card>
   );

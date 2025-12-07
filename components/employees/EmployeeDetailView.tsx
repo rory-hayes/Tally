@@ -235,12 +235,13 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
 
   const issueItems = data.issues ?? [];
   const currentPayDateLabel = formatDisplayDate(
-    data.currentPayslip.pay_date ?? null,
+    data.currentBatchPayDate ?? data.currentPayslip.pay_date ?? null,
     data.currentBatchPeriodLabel
   );
-  const previousPayDateLabel = data.previousPayslip
-    ? formatDisplayDate(data.previousPayslip.pay_date ?? null, data.previousBatchPeriodLabel)
-    : data.previousBatchPeriodLabel ?? "None";
+  const previousPayDateLabel = formatDisplayDate(
+    data.previousBatchPayDate ?? data.previousPayslip?.pay_date ?? null,
+    data.previousBatchPeriodLabel ?? "None"
+  );
 
   const handleResolve = (issueId: string, resolved: boolean) => {
     if (resolved) {

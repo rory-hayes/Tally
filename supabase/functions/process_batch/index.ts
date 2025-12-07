@@ -7,10 +7,10 @@ import {
   NormalizedTextractResult,
   buildPayslipInsert,
   deriveIdentifierFromPath,
-  derivePayDateFromBatch,
   ensureNormalizedHasContent,
   listMissingFields,
   normalizeTextractResponse,
+  resolvePayDate,
 } from "./helpers.ts";
 import {
   PAYSLIP_SELECT_FIELDS,
@@ -167,8 +167,12 @@ async function handleJob(
 
     const employeeId = await resolveEmployee(supabase, job);
     const previousPayslip = await fetchPreviousPayslip(supabase, job, employeeId);
-    const derivedPayDate = derivePayDateFromBatch(batchMeta.period_label, batchMeta.created_at);
-    const payDate = normalized.pay_date ?? derivedPayDate;
+    const payDate = resolvePayDate(
+      batchMeta.pay_date,
+      normalized.pay_date,
+      batchMeta.period_label,
+      batchMeta.created_at
+    );
     if (!payDate) {
       throw new Error("Unable to determine pay date for payslip");
     }
@@ -404,6 +408,7 @@ async function refreshBatchProgress(
 type BatchMeta = {
   period_label: string | null;
   created_at: string | null;
+  pay_date: string | null;
 };
 
 async function fetchBatchMeta(
@@ -413,7 +418,7 @@ async function fetchBatchMeta(
 ): Promise<BatchMeta> {
   const { data, error } = await supabase
     .from("batches")
-    .select("period_label, created_at, organisation_id")
+    .select("period_label, created_at, organisation_id, pay_date")
     .eq("id", batchId)
     .maybeSingle();
 
@@ -428,6 +433,7 @@ async function fetchBatchMeta(
   return {
     period_label: data.period_label ?? null,
     created_at: data.created_at ?? null,
+    pay_date: data.pay_date ?? null,
   };
 }
 

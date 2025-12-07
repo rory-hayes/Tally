@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Card, Form, Input, InputNumber, Select, Space, Button, Alert } from "antd";
+import { Card, Form, Input, InputNumber, Select, Space, Button, Alert, Typography } from "antd";
 import { useEmployeeContract } from "@/hooks/useEmployeeContract";
 
 type ContractEditorProps = {
@@ -48,6 +48,24 @@ export function ContractEditor({ employeeId }: ContractEditorProps) {
   return (
     <Card title="Contract details" size="small">
       {status === "error" && error ? <Alert type="error" message={error} style={{ marginBottom: 16 }} /> : null}
+      {status === "success" && !data ? (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Import contract data to avoid manual typing"
+          description={
+            <Space direction="vertical" size="small">
+              <Typography.Text>
+                Upload your HR/payroll contract CSV once via Data sources → Contract & HR to prefill these fields.
+              </Typography.Text>
+              <Button type="link" href="/data/contracts">
+                Open contract importer
+              </Button>
+            </Space>
+          }
+        />
+      ) : null}
       <Form
         form={form}
         layout="vertical"

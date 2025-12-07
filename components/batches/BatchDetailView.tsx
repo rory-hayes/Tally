@@ -14,8 +14,10 @@ import {
   Upload,
   message,
   Popconfirm,
+  Progress,
+  notification,
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { UploadFile, RcFile } from "antd/es/upload/interface";
 import { useOrganisation } from "@/context/OrganisationContext";
 import { useBatchDetail } from "@/hooks/useBatchDetail";
@@ -49,6 +51,8 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const [reportVisible, setReportVisible] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ uploaded: number; total: number } | null>(null);
+  const lastStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -119,8 +123,11 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     }
 
     setUploading(true);
+    setUploadProgress({ uploaded: 0, total: files.length });
     try {
-      await uploadBatchFiles(batch.id, files);
+      await uploadBatchFiles(batch.id, files, (uploaded, total) =>
+        setUploadProgress({ uploaded, total })
+      );
       await updateBatchStatus(organisationId, batch.id, {
         total_files: (batch.total_files ?? 0) + files.length,
       });
@@ -147,6 +154,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       );
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -260,11 +268,22 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   ];
 
   const createdAt = new Date(batch.created_at).toLocaleString();
+  const payDateLabel = batch.pay_date
+    ? new Date(batch.pay_date).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "—";
   const hasValidFileTotals =
     typeof batch.processed_files === "number" && typeof batch.total_files === "number";
   const processedLabel = hasValidFileTotals
     ? `${batch.processed_files}/${batch.total_files} files processed`
     : null;
+  const progressPercent =
+    hasValidFileTotals && batch.total_files > 0
+      ? Math.round((batch.processed_files / batch.total_files) * 100)
+      : 0;
   const hasActiveJobs = data.jobs.pending + data.jobs.processing > 0;
   const hasFailedJobs = data.jobs.failedJobs.length > 0;
   const derivedStatus =
@@ -281,6 +300,25 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         }))
       : [];
 
+  useEffect(() => {
+    if (!batch) return;
+    const previous = lastStatusRef.current;
+    if (previous && previous !== derivedStatus) {
+      if (derivedStatus === "completed") {
+        notification.success({
+          message: "Batch processing completed",
+          description: `${batch.period_label ?? "Batch"} (${payDateLabel}) has finished processing.`,
+        });
+      } else if (derivedStatus === "failed") {
+        notification.error({
+          message: "Batch processing finished with failures",
+          description: "Review failed files below and retry once issues are fixed.",
+        });
+      }
+    }
+    lastStatusRef.current = derivedStatus;
+  }, [batch, derivedStatus, payDateLabel]);
+
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
       <Card
@@ -295,6 +333,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             </Button>
             <Popconfirm
               title="Delete this batch?"
+              description="Payslips, issues, and attached artefacts for this batch will be permanently removed."
               okText="Delete"
               cancelText="Cancel"
               onConfirm={handleDeleteBatch}
@@ -310,6 +349,9 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         </Typography.Title>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Period: <strong>{batch.period_label}</strong>
+        </Typography.Paragraph>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          Pay date: <strong>{payDateLabel}</strong>
         </Typography.Paragraph>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Status:{" "}
@@ -343,7 +385,8 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             ))}
           </Typography.Paragraph>
         ) : null}
-          {processedLabel && (
+        {processedLabel && (
+          <Space direction="vertical" style={{ width: "100%" }}>
             <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
               <span data-testid="batch-file-progress">{processedLabel}</span>
               {hasFailedJobs && (
@@ -352,7 +395,18 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
                 </Tag>
               )}
             </Typography.Paragraph>
-          )}
+            <Progress
+              percent={progressPercent}
+              status={
+                derivedStatus === "failed"
+                  ? "exception"
+                  : derivedStatus === "completed"
+                  ? "success"
+                  : "active"
+              }
+            />
+          </Space>
+        )}
         {hasFailedJobs && (
           <Alert
             type="error"
@@ -427,29 +481,38 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       </Card>
 
       <Card title="Upload payslips">
-        <Upload.Dragger {...draggerProps} style={{ marginBottom: 16 }}>
-          <p className="ant-upload-drag-icon">Drop PDFs here or click to add</p>
-          <p className="ant-upload-text">
-            Upload payslip PDFs for this batch. Files are stored securely.
-          </p>
-          {fileList.length === 0 && (
-            <Typography.Text type="secondary">
-              Select one or more PDF files to enable upload. Accepted: PDF, up to 15MB each. You can drag from your desktop; in test sandboxes place files in a visible folder (e.g. share/slides).
-            </Typography.Text>
-          )}
-        </Upload.Dragger>
-        <Space>
-          <Button onClick={() => setFileList([])} disabled={fileList.length === 0 || uploading}>
-            Clear selection
-          </Button>
-          <Button
-            type="primary"
-            onClick={handleUpload}
-            loading={uploading}
-            disabled={uploading || fileList.length === 0}
-          >
-            {uploading ? "Uploading…" : "Upload files"}
-          </Button>
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Upload.Dragger {...draggerProps} style={{ marginBottom: 16 }}>
+            <p className="ant-upload-drag-icon">Drop PDFs here or click to add</p>
+            <p className="ant-upload-text">
+              Upload payslip PDFs for this batch. Files are stored securely.
+            </p>
+            {fileList.length === 0 && (
+              <Typography.Text type="secondary">
+                Select one or more PDF files to enable upload. Accepted: PDF, up to 15MB each. You can drag from your desktop; in test sandboxes place files in a visible folder (e.g. share/slides).
+              </Typography.Text>
+            )}
+          </Upload.Dragger>
+          <Space>
+            <Button onClick={() => setFileList([])} disabled={fileList.length === 0 || uploading}>
+              Clear selection
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleUpload}
+              loading={uploading}
+              disabled={uploading || fileList.length === 0}
+            >
+              {uploading ? "Uploading…" : "Upload files"}
+            </Button>
+          </Space>
+          {uploadProgress ? (
+            <Progress
+              percent={Math.round((uploadProgress.uploaded / uploadProgress.total) * 100)}
+              status={uploading ? "active" : "normal"}
+              format={() => `${uploadProgress.uploaded}/${uploadProgress.total} files`}
+            />
+          ) : null}
         </Space>
       </Card>
 

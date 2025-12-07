@@ -35,6 +35,14 @@ function PaymentsIntegrationView() {
       description="Upload SEPA/BACS-style CSV payment files to reconcile bank payments against net pay."
       expectedColumns={["employee_id", "amount", "currency", "reference"]}
       sampleCsv={sampleCsv}
+      sampleFilename="bank_payments_template.csv"
+      helperText="Use the same employee IDs as payslips so we can match payments to net pay. References are shown in issue descriptions."
+      fieldHelp={[
+        { name: "employee_id", description: "Identifier matching payslip reference." },
+        { name: "amount", description: "Net pay amount to be transferred." },
+        { name: "currency", description: "Currency code for the payment." },
+        { name: "reference", description: "Bank payment reference or narrative." },
+      ]}
       onSubmit={handleUpload}
       actionLabel="Upload payment file"
     />

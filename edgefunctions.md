@@ -28,7 +28,7 @@ This document tracks the Supabase Edge Functions that backoffice services rely o
 - **Inputs**: `GET` request with query parameter `batch_id` plus the caller’s Supabase session (Bearer token + publishable key). Requires the caller to belong to the same organisation as the batch.
 - **Side Effects**:
   - Validates the authenticated user’s profile and organisation.
-  - Fetches `issues` joined with `employees` for the requested batch.
-  - Serialises the dataset via `buildBatchIssuesCsv` and responds with a `text/csv` attachment (`batch-{id}-issues.csv`).
+  - Fetches `issues` joined with `employees` for the requested batch (excluding `ocr_ingest` noise).
+  - Serialises the dataset via `buildBatchIssuesCsv` and responds with a `text/csv` attachment (`batch-{id}-issues.csv`). The CSV starts with a summary row (`batch_id, period_label, pay_date, status, processed_files, total_files, critical_issues, warning_issues, info_issues`), then a blank line, then issue rows (`employee, employee_ref, rule_code, severity, description, values`).
 
  

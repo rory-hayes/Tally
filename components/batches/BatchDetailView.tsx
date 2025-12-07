@@ -16,6 +16,7 @@ import {
   Popconfirm,
   Progress,
   notification,
+  Modal,
 } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UploadFile, RcFile } from "antd/es/upload/interface";
@@ -29,6 +30,7 @@ import { downloadBatchIssuesCsv } from "@/lib/functions/downloadBatchIssuesCsv";
 import { BatchReportModal } from "@/components/batches/BatchReportModal";
 import { logAuditEvent } from "@/lib/repositories/auditLogs";
 import { retryFailedJobs } from "@/lib/repositories/processingJobs";
+import { resetFailedBatchDataFiles } from "@/lib/repositories/batchDataFiles";
 import { useRouter } from "next/navigation";
 
 type BatchDetailViewProps = {
@@ -111,6 +113,12 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
           type: file.type,
         }))
       : [];
+  const failedArtefacts = dataFileBadges.filter((file) => file.status === "failed");
+  const payDateMismatchFailures = jobSummary.failedJobs.filter((job) =>
+    (job.error ?? "").toLowerCase().includes("pay date mismatch")
+  );
+  const hasPayDateMismatchFailures = payDateMismatchFailures.length > 0;
+  const hasFailedUploads = hasFailedJobs || failedArtefacts.length > 0;
 
   useEffect(() => {
     if (!batch) return;
@@ -138,7 +146,10 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
       multiple: true,
       accept: ".pdf,.PDF",
       fileList,
-      showUploadList: true,
+      showUploadList: { showRemoveIcon: true },
+      onChange: (info: { fileList: UploadFile[] }) => {
+        setFileList(info.fileList);
+      },
       onRemove: (file: UploadFile) => {
         setFileList((prev) => prev.filter((item) => item.uid !== file.uid));
       },
@@ -147,22 +158,12 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         const maxSizeMb = 15;
         if (!isPdf) {
           message.error(`${file.name} is not a PDF. Please upload PDF payslips.`);
-          return false;
+          return Upload.LIST_IGNORE;
         }
         if (file.size / 1024 / 1024 > maxSizeMb) {
           message.error(`${file.name} is too large. Limit ${maxSizeMb}MB per file.`);
-          return false;
+          return Upload.LIST_IGNORE;
         }
-        setFileList((prev) => [
-          ...prev,
-          {
-            uid: file.uid,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            originFileObj: file,
-          },
-        ]);
         return false;
       },
     }),
@@ -239,20 +240,38 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     }
   };
 
-  const handleRetryFailed = async () => {
+  const performRetryFailed = async (allowOutOfCycle: boolean) => {
     if (!batch) return;
     setRetrying(true);
     try {
-      const resetCount = await retryFailedJobs(organisationId, batch.id);
-      if (resetCount === 0) {
+      const resetCount = await retryFailedJobs(
+        organisationId,
+        batch.id,
+        allowOutOfCycle ? { allowOutOfCycle: true } : undefined
+      );
+      let artefactResets = 0;
+      try {
+        artefactResets = await resetFailedBatchDataFiles(organisationId, batch.id);
+      } catch (artefactError) {
+        const messageText =
+          artefactError instanceof Error
+            ? artefactError.message
+            : "Unable to reset failed artefacts.";
+        message.warning(messageText);
+      }
+      const totalReset = resetCount + artefactResets;
+      if (totalReset === 0) {
         message.info("No failed files to retry.");
         return;
       }
-      await updateBatchStatus(organisationId, batch.id, {
-        status: "processing",
-        processed_files: Math.max((batch.processed_files ?? 0) - resetCount, 0),
-      });
-      message.success(`Retrying ${resetCount} file(s)`);
+      if (resetCount > 0) {
+        await updateBatchStatus(organisationId, batch.id, {
+          status: "processing",
+          processed_files: Math.max((batch.processed_files ?? 0) - resetCount, 0),
+        });
+      }
+      const allowSuffix = allowOutOfCycle ? " (out-of-cycle payslips allowed)" : "";
+      message.success(`Retrying ${totalReset} file(s)${allowSuffix}`);
       await refresh();
     } catch (err) {
       message.error(
@@ -261,6 +280,23 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     } finally {
       setRetrying(false);
     }
+  };
+
+  const handleRetryFailed = async () => {
+    if (!batch) return;
+    if (hasPayDateMismatchFailures) {
+      Modal.confirm({
+        title: "Retry failed files",
+        content:
+          "Some payslips were blocked because their document pay date does not match the batch pay date. Allow out-of-cycle payslips on retry?",
+        okText: "Allow & retry",
+        cancelText: "Retry without allowing",
+        onOk: () => performRetryFailed(true),
+        onCancel: () => void performRetryFailed(false),
+      });
+      return;
+    }
+    await performRetryFailed(false);
   };
 
   const handleDeleteBatch = async () => {
@@ -340,7 +376,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
               Download CSV
             </Button>
             <Button onClick={() => setReportVisible(true)}>View report</Button>
-            <Button onClick={handleRetryFailed} loading={retrying} disabled={!hasFailedJobs}>
+            <Button onClick={handleRetryFailed} loading={retrying} disabled={!hasFailedUploads}>
               Retry failed
             </Button>
             <Popconfirm
@@ -397,6 +433,11 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             ))}
           </Typography.Paragraph>
         ) : null}
+        {failedArtefacts.length ? (
+          <Typography.Text type="danger" style={{ display: "block", marginBottom: 0 }}>
+            {failedArtefacts.length} artefact(s) failed to parse. Fix the CSV format or mappings, then retry.
+          </Typography.Text>
+        ) : null}
         {processedLabel && (
           <Space direction="vertical" style={{ width: "100%" }}>
             <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
@@ -434,6 +475,11 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
                     </li>
                   ))}
                 </ul>
+                {hasPayDateMismatchFailures ? (
+                  <Typography.Text type="danger">
+                    Pay-date enforcement blocked {payDateMismatchFailures.length} file(s). Confirm the batch pay date or choose “Allow & retry” to include out-of-cycle payslips.
+                  </Typography.Text>
+                ) : null}
                 <Typography.Text type="secondary">
                   Check that each PDF contains selectable text and is not encrypted. Then click “Retry failed.”
                 </Typography.Text>

@@ -43,12 +43,14 @@ export async function createProcessingJob(input: {
 
 export async function retryFailedJobs(
   organisationId: string,
-  batchId: string
+  batchId: string,
+  options?: { allowOutOfCycle?: boolean }
 ): Promise<number> {
   const supabase = getSupabaseBrowserClient();
+  const errorValue = options?.allowOutOfCycle ? "ALLOW_OUT_OF_CYCLE" : null;
   const { data, error } = await supabase
     .from("processing_jobs")
-    .update({ status: "pending", error: null })
+    .update({ status: "pending", error: errorValue })
     .eq("organisation_id", organisationId)
     .eq("batch_id", batchId)
     .eq("status", "failed")
@@ -60,4 +62,3 @@ export async function retryFailedJobs(
 
   return (data ?? []).length;
 }
-

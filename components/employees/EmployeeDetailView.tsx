@@ -231,7 +231,7 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
     );
   }
 
-  const issueItems = data.issues ?? [];
+  const issueItems = (data.issues ?? []).filter((issue) => issue.rule_code !== "ocr_ingest");
   const currentPayDateLabel = formatDisplayDate(
     data.currentBatchPayDate ?? data.currentPayslip.pay_date ?? null,
     data.currentBatchPeriodLabel

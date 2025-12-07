@@ -65,6 +65,7 @@ type PayslipRecord = {
 type IssueRow = {
   employee_id: string | null;
   severity: IssueSeverity | null;
+  rule_code?: string | null;
 };
 
 type ProcessingJobRow = {
@@ -86,7 +87,12 @@ export const buildEmployeeIssueSummaries = (
 ): { employees: EmployeeIssueSummary[]; totals: Record<IssueSeverity, number> } => {
   const issueMap = new Map<string, Record<IssueSeverity, number>>();
   (issues ?? []).forEach((issue) => {
-    if (!issue.employee_id || !issue.severity || !ISSUE_LEVELS.includes(issue.severity)) {
+    if (
+      !issue.employee_id ||
+      !issue.severity ||
+      issue.rule_code === "ocr_ingest" ||
+      !ISSUE_LEVELS.includes(issue.severity)
+    ) {
       return;
     }
     const counts = issueMap.get(issue.employee_id) ?? emptyIssueCounts();
@@ -177,7 +183,7 @@ export async function fetchBatchDetail(
 
   const { data: issueRows, error: issuesError } = await supabase
     .from("issues")
-    .select("employee_id, severity")
+    .select("employee_id, severity, rule_code")
     .eq("organisation_id", organisationId)
     .eq("batch_id", batchId)
     .eq("resolved", false);

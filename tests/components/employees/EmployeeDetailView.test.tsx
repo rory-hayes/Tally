@@ -137,9 +137,9 @@ describe("EmployeeDetailView", () => {
     expect(screen.getAllByText("25.0%").length).toBeGreaterThan(0);
   });
 
-  it("displays info-level issues", () => {
+  it("filters out noisy OCR ingestion issues", () => {
     render(<EmployeeDetailView employeeId="emp-1" batchId="batch-1" />);
-    expect(screen.getByText(/OCR ingestion captured/i)).toBeInTheDocument();
+    expect(screen.queryByText(/OCR ingestion captured/i)).not.toBeInTheDocument();
   });
 
   it("falls back to batch period when pay date missing", () => {

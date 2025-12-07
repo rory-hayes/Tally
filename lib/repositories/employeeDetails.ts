@@ -57,6 +57,30 @@ type PayslipRecord = {
   employees: { name: string | null; external_employee_ref: string | null } | null;
 };
 
+export const pickPreviousPayslip = (
+  payslips: PayslipRecord[] | null | undefined,
+  currentBatchId: string
+): PayslipRecord | null => {
+  if (!payslips?.length) return null;
+  const current = payslips.find((p) => p.batch_id === currentBatchId);
+  if (!current) return null;
+  const otherPayslips = payslips.filter((p) => p.batch_id !== currentBatchId);
+  if (!otherPayslips.length) return null;
+
+  if (current.pay_date) {
+    const currentDate = new Date(`${current.pay_date}T00:00:00`);
+    const earlier = otherPayslips.find(
+      (p) => p.pay_date && new Date(`${p.pay_date}T00:00:00`) < currentDate
+    );
+    if (earlier) {
+      return earlier;
+    }
+    return null;
+  }
+
+  return otherPayslips[0] ?? null;
+};
+
 export async function fetchEmployeeComparison(args: {
   organisationId: string;
   employeeId: string;
@@ -111,7 +135,10 @@ export async function fetchEmployeeComparison(args: {
     throw new Error("Payslip not found for employee in this batch");
   }
 
-  const previousPayslip = (payslips ?? []).find((p) => p.batch_id !== batchId) ?? null;
+  const previousPayslip = pickPreviousPayslip(
+    payslips as PayslipRecord[] | null | undefined,
+    batchId
+  );
   const employeeName =
     currentPayslip.employees && !Array.isArray(currentPayslip.employees)
       ? (currentPayslip.employees as PayslipRecord["employees"])?.name ?? "Employee"
@@ -176,6 +203,10 @@ export async function fetchEmployeeComparison(args: {
     throw new Error(`Failed to load issues: ${issuesError.message}`);
   }
 
+  const filteredIssues = ((issuesData ?? []) as IssueRow[]).filter(
+    (issue) => issue.rule_code !== "ocr_ingest"
+  );
+
   return {
     employeeId,
     employeeName,
@@ -193,7 +224,7 @@ export async function fetchEmployeeComparison(args: {
     currentPayslip,
     previousPayslip,
     diff,
-    issues: (issuesData ?? []) as IssueRow[],
+    issues: filteredIssues,
   };
 }
 

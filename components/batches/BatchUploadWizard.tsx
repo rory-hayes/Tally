@@ -18,12 +18,12 @@ import {
   message,
   Progress,
   Modal,
+  Tooltip,
 } from "antd";
 import type { RcFile, UploadFile } from "antd/es/upload/interface";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
-import { updateBatchStatus } from "@/lib/repositories/batches";
-import { createBatchForClient } from "@/lib/repositories/batches";
-import { recordBatchDataFile } from "@/lib/repositories/batchDataFiles";
+import { createBatchForClient, getBatchById, updateBatchStatus } from "@/lib/repositories/batches";
+import { listBatchDataFiles, recordBatchDataFile } from "@/lib/repositories/batchDataFiles";
 import { listClientDataSources } from "@/lib/repositories/clientDataSources";
 import type { ClientDataSource } from "@/lib/repositories/clientDataSources";
 import { getDefaultRuleConfig } from "@/lib/rules/config";
@@ -193,6 +193,9 @@ export function BatchUploadWizard({
   );
   const [uploadingArtefactType, setUploadingArtefactType] = useState<DataSourceType | null>(null);
   const [artefactUploadsCompleted, setArtefactUploadsCompleted] = useState(false);
+  const [uploadedArtefactTypes, setUploadedArtefactTypes] = useState<Set<DataSourceType>>(
+    () => new Set()
+  );
 
   const downloadTemplate = (type: DataSourceType) => {
     const template = artefactTemplates[type];
@@ -229,8 +232,34 @@ export function BatchUploadWizard({
   const handleStepChange = (value: number) => {
     if (value <= currentStep) {
       setCurrentStep(value);
+      setHasUnsavedChanges(true);
     }
   };
+
+  const syncDataFiles = useCallback(
+    async (batchId: string) => {
+      try {
+        const files = await listBatchDataFiles(organisationId, batchId);
+        if (!files.length) {
+          setUploadedArtefactTypes(new Set());
+          setArtefactUploadsCompleted(false);
+          return;
+        }
+        const uploadedTypes = new Set<DataSourceType>();
+        const summaries: Record<string, string> = {};
+        files.forEach((file) => {
+          uploadedTypes.add(file.type);
+          summaries[file.type] = file.original_filename ?? "Uploaded";
+        });
+        setUploadedArtefactTypes(uploadedTypes);
+        setSummary((prev) => ({ ...prev, ...summaries }));
+        setArtefactUploadsCompleted(files.length > 0);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to load existing artefacts");
+      }
+    },
+    [organisationId, clientId]
+  );
 
   useEffect(() => {
     const loadSources = async () => {
@@ -258,35 +287,75 @@ export function BatchUploadWizard({
   }, [hasUnsavedChanges]);
 
   const configuredTypes = useMemo(() => new Set(dataSources.map((s) => s.type)), [dataSources]);
-  const contractPackReady = configuredTypes.has("CONTRACT_SNAPSHOT");
+  const contractPackReady = useMemo(
+    () => configuredTypes.has("CONTRACT_SNAPSHOT") && uploadedArtefactTypes.has("CONTRACT_SNAPSHOT"),
+    [configuredTypes, uploadedArtefactTypes]
+  );
   const draftStorageKey = `tally-batch-draft-${clientId}`;
 
   useEffect(() => {
-    if (batchInfo) return;
-    try {
-      const raw = localStorage.getItem(draftStorageKey);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as {
-        period_label?: string;
-        pay_date?: string | null;
-        pay_frequency?: string | null;
-        selectedRulePacks?: string[];
-      };
-      form.setFieldsValue({
-        period_label: draft.period_label,
-        pay_date: draft.pay_date ? dayjs(draft.pay_date) : undefined,
-        pay_frequency: draft.pay_frequency ?? "monthly",
-      });
-      if (draft.selectedRulePacks?.length) {
-        setSelectedRulePacks(draft.selectedRulePacks);
-      }
-    } catch {
-      // ignore invalid draft
+    if (contractPackReady && !selectedRulePacks.includes("contract-compliance")) {
+      setSelectedRulePacks((prev) => [...prev, "contract-compliance"]);
+      setHasUnsavedChanges(true);
     }
-  }, [batchInfo, draftStorageKey, form, setSelectedRulePacks]);
+  }, [contractPackReady, selectedRulePacks]);
+
+  useEffect(() => {
+    const restoreDraft = async () => {
+      try {
+        const raw = localStorage.getItem(draftStorageKey);
+        if (!raw) return;
+        const draft = JSON.parse(raw) as {
+          period_label?: string;
+          pay_date?: string | null;
+          pay_frequency?: string | null;
+          selectedRulePacks?: string[];
+          batchId?: string | null;
+          currentStep?: number;
+          uploadedArtefactTypes?: DataSourceType[];
+        };
+        form.setFieldsValue({
+          period_label: draft.period_label,
+          pay_date: draft.pay_date ? dayjs(draft.pay_date) : undefined,
+          pay_frequency: draft.pay_frequency ?? "monthly",
+        });
+        if (draft.selectedRulePacks?.length) {
+          setSelectedRulePacks(draft.selectedRulePacks);
+        }
+        if (draft.uploadedArtefactTypes?.length) {
+          setUploadedArtefactTypes(new Set(draft.uploadedArtefactTypes));
+        }
+        setHasUnsavedChanges(true);
+        if (draft.batchId && !batchInfo) {
+          const existing = await getBatchById(organisationId, draft.batchId);
+          if (existing) {
+            setBatchInfo({
+              id: existing.id,
+              period_label: existing.period_label,
+              pay_date: existing.pay_date ?? null,
+            });
+            const nextStep =
+              typeof draft.currentStep === "number"
+                ? Math.min(Math.max(draft.currentStep, 1), 4)
+                : 1;
+            setCurrentStep(nextStep);
+            if (existing.total_files) {
+              setSummary((prev) => ({ ...prev, payslips: `${existing.total_files} file(s)` }));
+            }
+            setHasUnsavedChanges(true);
+            await syncDataFiles(existing.id);
+          } else {
+            localStorage.removeItem(draftStorageKey);
+          }
+        }
+      } catch {
+        // ignore invalid draft
+      }
+    };
+    void restoreDraft();
+  }, [batchInfo, draftStorageKey, form, organisationId, syncDataFiles]);
 
   const persistDraft = useCallback(() => {
-    if (batchInfo) return;
     const values = form.getFieldsValue();
     const payDateValue =
       values.pay_date && typeof values.pay_date.format === "function"
@@ -297,20 +366,31 @@ export function BatchUploadWizard({
       pay_date: payDateValue,
       pay_frequency: values.pay_frequency ?? "monthly",
       selectedRulePacks,
+      batchId: batchInfo?.id ?? null,
+      currentStep,
+      uploadedArtefactTypes: Array.from(uploadedArtefactTypes),
     };
     try {
       localStorage.setItem(draftStorageKey, JSON.stringify(payload));
     } catch {
       // best effort
     }
-  }, [batchInfo, draftStorageKey, form, selectedRulePacks]);
+  }, [batchInfo?.id, currentStep, draftStorageKey, form, selectedRulePacks, uploadedArtefactTypes]);
+
+  useEffect(() => {
+    persistDraft();
+  }, [batchInfo?.id, currentStep, selectedRulePacks, uploadedArtefactTypes, persistDraft]);
 
   const handleCreateBatch = async () => {
     const values = await form.validateFields();
+    const payDateValue =
+      values.pay_date && typeof values.pay_date.format === "function"
+        ? values.pay_date.format("YYYY-MM-DD")
+        : null;
     const batch = await createBatchForClient(organisationId, {
       clientId,
       periodLabel: values.period_label,
-      payDate: values.pay_date ? values.pay_date.format("YYYY-MM-DD") : null,
+      payDate: payDateValue,
       payFrequency: values.pay_frequency ?? null,
       totalFiles: 0,
       processedFiles: 0,
@@ -321,29 +401,53 @@ export function BatchUploadWizard({
       period_label: batch.period_label,
       pay_date: batch.pay_date ?? null,
     });
-    localStorage.removeItem(draftStorageKey);
     message.success("Batch created. Continue with uploads.");
     setCurrentStep(1);
     setHasUnsavedChanges(true);
+    try {
+      localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          period_label: values.period_label ?? "",
+          pay_date: payDateValue,
+          pay_frequency: values.pay_frequency ?? "monthly",
+          selectedRulePacks,
+          batchId: batch.id,
+          currentStep: 1,
+          uploadedArtefactTypes: Array.from(uploadedArtefactTypes),
+        })
+      );
+    } catch {
+      // best effort
+    }
   };
 
   const draggerProps = {
     multiple: true,
     accept: ".pdf,.zip,.ZIP,.PDF",
     fileList: payslipFiles,
+    showUploadList: { showRemoveIcon: true },
     beforeUpload: (file: RcFile) => {
-      setPayslipFiles((prev) => [
-        ...prev,
-        {
-          uid: file.uid,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          originFileObj: file,
-        },
-      ]);
+      const lowerName = file.name.toLowerCase();
+      const isAllowed =
+        file.type?.includes("pdf") ||
+        lowerName.endsWith(".pdf") ||
+        lowerName.endsWith(".zip");
+      const maxSizeMb = 15;
+      if (!isAllowed) {
+        message.error(`${file.name} must be a PDF or ZIP.`);
+        return Upload.LIST_IGNORE;
+      }
+      if (file.size / 1024 / 1024 > maxSizeMb) {
+        message.error(`${file.name} is too large. Limit ${maxSizeMb}MB per file.`);
+        return Upload.LIST_IGNORE;
+      }
       setHasUnsavedChanges(true);
       return false;
+    },
+    onChange: (info: { fileList: UploadFile[] }) => {
+      setPayslipFiles(info.fileList);
+      setHasUnsavedChanges(true);
     },
     onRemove: (file: UploadFile) => {
       setPayslipFiles((prev) => prev.filter((f) => f.uid !== file.uid));
@@ -391,6 +495,8 @@ export function BatchUploadWizard({
       setSummary((prev) => ({ ...prev, payslips: `${uploads.length} file(s)` }));
       message.success(`Uploaded ${uploads.length} payslip file(s).`);
       setCurrentStep(2);
+      setHasUnsavedChanges(true);
+      persistDraft();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "Failed to upload payslips");
     } finally {
@@ -432,7 +538,14 @@ export function BatchUploadWizard({
 
       setArtefactFiles((prev) => ({ ...prev, [type]: null }));
       setSummary((prev) => ({ ...prev, [type]: "Uploaded" }));
+      setUploadedArtefactTypes((prev) => {
+        const next = new Set(prev);
+        next.add(type);
+        return next;
+      });
       setArtefactUploadsCompleted(true);
+      setHasUnsavedChanges(true);
+      persistDraft();
       message.success(`${dataSourceLabels[type]} uploaded`);
     } catch (err) {
       const messageText = err instanceof Error ? err.message : "Upload failed";
@@ -452,11 +565,14 @@ export function BatchUploadWizard({
         size="small"
         title={dataSourceLabels[type]}
         extra={
-          configured ? (
-            <Tag color="green">Configured</Tag>
-          ) : (
-            <Tag color="default">Configure in Client → Data sources</Tag>
-          )
+          <Space size="small">
+            {configured ? (
+              <Tag color="green">Configured</Tag>
+            ) : (
+              <Tag color="default">Configure in Client → Data sources</Tag>
+            )}
+            {uploadedArtefactTypes.has(type) ? <Tag color="blue">Uploaded</Tag> : null}
+          </Space>
         }
         style={{ minWidth: 260 }}
       >
@@ -567,6 +683,7 @@ export function BatchUploadWizard({
       }
       message.success("Batch created and processing started");
       setHasUnsavedChanges(false);
+      localStorage.removeItem(draftStorageKey);
       if (onComplete) onComplete(batchInfo.id);
     } catch (err) {
       message.error(err instanceof Error ? err.message : "Unable to start processing");
@@ -590,7 +707,7 @@ export function BatchUploadWizard({
             type="info"
             showIcon
             message="One pay date per batch"
-            description="All payslips in this batch should share the same pay date. We’ll flag any payslips whose document date differs from the batch pay date."
+            description="All payslips in this batch should share the same pay date. If OCR finds a different document date, we’ll block it until you confirm the out-of-cycle payslip."
             style={{ marginBottom: 16 }}
           />
           <Form.Item
@@ -605,7 +722,22 @@ export function BatchUploadWizard({
             name="pay_date"
             rules={[{ required: true, message: "Select a pay date for this batch" }]}
           >
-            <DatePicker style={{ width: "100%" }} />
+            <DatePicker
+              style={{ width: "100%" }}
+              format="YYYY-MM-DD"
+              inputReadOnly={false}
+              placeholder="YYYY-MM-DD"
+              allowClear
+              onBlur={(event) => {
+                const value = event.target.value.trim();
+                if (!value) return;
+                if (!dayjs(value, "YYYY-MM-DD", true).isValid()) {
+                  message.error("Enter pay date as YYYY-MM-DD");
+                  return;
+                }
+                form.setFieldsValue({ pay_date: dayjs(value, "YYYY-MM-DD") });
+              }}
+            />
           </Form.Item>
           <Form.Item label="Frequency" name="pay_frequency">
             <Input placeholder="monthly / weekly / fortnightly" />
@@ -631,6 +763,9 @@ export function BatchUploadWizard({
               Files are stored per batch. We recommend one file per employee.
             </p>
           </Upload.Dragger>
+          <Typography.Text type="secondary">
+            Drag in multiple files or select several at once; use the list to remove anything before uploading.
+          </Typography.Text>
           <Button
             type="primary"
             onClick={uploadPayslips}
@@ -699,13 +834,14 @@ export function BatchUploadWizard({
           >
             <Space direction="vertical" style={{ width: "100%" }}>
               {rulePackOptions.map((opt) => {
-                const disabled =
-                  opt.id === "contract-compliance" && !contractPackReady;
-                const helper =
-                  opt.id === "contract-compliance" && !contractPackReady
-                    ? "Enable by configuring Contract data source and uploading a contract CSV in step 3."
-                    : null;
-                return (
+                const requiresContracts = opt.id === "contract-compliance";
+                const disabled = requiresContracts && !contractPackReady;
+                const helper = requiresContracts
+                  ? contractPackReady
+                    ? "Enabled because a Contract snapshot has been uploaded for this batch."
+                    : "Configure the Contract data source and upload a Contract snapshot CSV in step 3."
+                  : null;
+                const checkboxNode = (
                   <Checkbox
                     key={opt.id}
                     value={opt.id}
@@ -721,6 +857,17 @@ export function BatchUploadWizard({
                     </Space>
                   </Checkbox>
                 );
+                if (requiresContracts && disabled) {
+                  return (
+                    <Tooltip
+                      key={opt.id}
+                      title="Upload a Contract / HR snapshot in step 3 after configuring the Contract data source."
+                    >
+                      {checkboxNode}
+                    </Tooltip>
+                  );
+                }
+                return checkboxNode;
               })}
             </Space>
           </Checkbox.Group>
@@ -786,14 +933,14 @@ export function BatchUploadWizard({
         type="info"
         showIcon
         message="Pay date and mappings drive downstream checks."
-        description="The pay date saved in step 1 is reused for all payslips and employee views. Use the Data sources tab to store mapping JSON; each artefact card includes required columns and a sample CSV."
+        description="The saved pay date is enforced for every payslip. We’ll block out-of-cycle documents until you confirm them, and drafts auto-save locally so you can resume later."
       />
       {hasUnsavedChanges ? (
         <Alert
           type="warning"
           showIcon
           message="Don't lose your progress"
-          description="We’ll warn before you close this tab. Finish the steps or click Create & start processing to save your batch."
+          description="We save this wizard as a draft in your browser and warn before you close the tab."
         />
       ) : null}
       {error ? <Alert type="error" message={error} showIcon /> : null}

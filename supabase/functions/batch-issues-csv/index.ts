@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
   const { data: batch, error: batchError } = await supabase
     .from("batches")
-    .select("id, organisation_id, client_id")
+    .select("id, organisation_id, client_id, period_label, pay_date, status, processed_files, total_files")
     .eq("id", batchId)
     .maybeSingle();
 
@@ -119,7 +119,11 @@ Deno.serve(async (req) => {
     });
   }
 
-  const csvRows: BatchIssueCsvRow[] = (issueRows ?? []).map((issue) => {
+  const filteredIssueRows = (issueRows ?? []).filter(
+    (issue) => issue.rule_code !== "ocr_ingest"
+  );
+
+  const csvRows: BatchIssueCsvRow[] = filteredIssueRows.map((issue) => {
     const employeeData = Array.isArray(issue.employees) ? issue.employees[0] : issue.employees;
     return {
       employeeName: employeeData?.name ?? "Employee",
@@ -131,7 +135,27 @@ Deno.serve(async (req) => {
     };
   });
 
-  const csv = buildBatchIssuesCsv(csvRows);
+  const severityCounts = filteredIssueRows.reduce(
+    (acc, issue) => {
+      if (issue.severity === "critical") acc.critical += 1;
+      if (issue.severity === "warning") acc.warning += 1;
+      if (issue.severity === "info") acc.info += 1;
+      return acc;
+    },
+    { critical: 0, warning: 0, info: 0 }
+  );
+
+  const csv = buildBatchIssuesCsv(csvRows, {
+    batchId,
+    periodLabel: batch.period_label ?? null,
+    payDate: batch.pay_date ?? null,
+    status: batch.status ?? null,
+    processedFiles: batch.processed_files ?? null,
+    totalFiles: batch.total_files ?? null,
+    criticalCount: severityCounts.critical,
+    warningCount: severityCounts.warning,
+    infoCount: severityCounts.info,
+  });
   const filename = `batch-${batchId}-issues.csv`;
 
   return new Response(csv, {
@@ -143,4 +167,3 @@ Deno.serve(async (req) => {
     },
   });
 });
-

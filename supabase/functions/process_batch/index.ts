@@ -33,6 +33,7 @@ type JobRow = {
   client_id: string;
   batch_id: string;
   storage_path: string;
+  error: string | null;
 };
 
 const RECONCILIATION_RULE_CODES = [
@@ -65,6 +66,8 @@ const JOB_PROCESSOR_BATCH_SIZE = Number(
 const AWS_REGION = Deno.env.get("AWS_REGION");
 const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID");
 const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY");
+
+const ALLOW_OUT_OF_CYCLE_FLAG = "ALLOW_OUT_OF_CYCLE";
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   throw new Error(
@@ -111,7 +114,7 @@ Deno.serve(async (req) => {
 
   const { data: jobs, error } = await supabase
     .from("processing_jobs")
-    .select("id, organisation_id, client_id, batch_id, storage_path")
+    .select("id, organisation_id, client_id, batch_id, storage_path, error")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(JOB_PROCESSOR_BATCH_SIZE);
@@ -193,15 +196,25 @@ async function handleJob(
     if (!payDate) {
       throw new Error("Unable to determine pay date for payslip");
     }
+    const payDateMismatch =
+      !!(batchMeta.pay_date && normalized.pay_date && normalized.pay_date !== batchMeta.pay_date);
+    const allowOutOfCycle = job.error === ALLOW_OUT_OF_CYCLE_FLAG;
+    if (payDateMismatch && !allowOutOfCycle) {
+      throw new Error(
+        `Pay date mismatch: payslip pay date ${normalized.pay_date} differs from batch pay date ${batchMeta.pay_date}. Confirm out-of-cycle before retrying.`
+      );
+    }
     const currentPayslip = await insertPayslip(supabase, job, employeeId, normalized, payDate);
-    await insertPayDateMismatchIssue(
-      supabase,
-      job,
-      employeeId,
-      payDate,
-      normalized.pay_date
-    );
-    await insertInfoIssue(supabase, job, employeeId, normalized);
+    if (payDateMismatch) {
+      await insertPayDateMismatchIssue(
+        supabase,
+        job,
+        employeeId,
+        payDate,
+        normalized.pay_date,
+        { confirmedOverride: allowOutOfCycle }
+      );
+    }
     await insertRuleIssues(supabase, currentPayslip, previousPayslip);
     await markJobStatus(supabase, job.id, true);
     await refreshBatchProgress(supabase, job.batch_id, job.organisation_id, job.client_id);
@@ -302,11 +315,17 @@ async function insertPayDateMismatchIssue(
   job: JobRow,
   employeeId: string,
   batchPayDate: string,
-  parsedPayDate: string | null
+  parsedPayDate: string | null,
+  options?: { confirmedOverride?: boolean }
 ) {
   if (!parsedPayDate || parsedPayDate === batchPayDate) {
     return;
   }
+
+  const override = options?.confirmedOverride ?? false;
+  const description = override
+    ? `Out-of-cycle payslip allowed: document pay date ${parsedPayDate} differs from batch pay date ${batchPayDate}.`
+    : `Payslip pay date ${parsedPayDate} differs from batch pay date ${batchPayDate}. Using batch date.`;
 
   await supabase.from("issues").insert({
     organisation_id: job.organisation_id,
@@ -315,30 +334,12 @@ async function insertPayDateMismatchIssue(
     employee_id: employeeId,
     rule_code: "pay_date_mismatch",
     severity: "warning",
-    description: `Payslip pay date ${parsedPayDate} differs from batch pay date ${batchPayDate}. Using batch date.`,
+    description,
     data: {
       batchPayDate,
       parsedPayDate,
+      overrideConfirmed: override,
     },
-    note: null,
-  });
-}
-
-async function insertInfoIssue(
-  supabase: ReturnType<typeof createClient>,
-  job: JobRow,
-  employeeId: string,
-  normalized: NormalizedTextractResult
-) {
-  await supabase.from("issues").insert({
-    organisation_id: job.organisation_id,
-    client_id: job.client_id,
-    batch_id: job.batch_id,
-    employee_id: employeeId,
-    rule_code: "ocr_ingest",
-    severity: "info",
-    description: `OCR ingestion captured ${normalized.raw_text.length} characters`,
-    data: null,
     note: null,
   });
 }

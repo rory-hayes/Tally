@@ -57,12 +57,13 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
-const draggerHandle: { beforeUpload?: (file: unknown) => unknown } = {};
+const draggerHandle: { beforeUpload?: (file: unknown) => unknown; onChange?: (info: unknown) => unknown } = {};
 
 vi.mock("antd", async () => {
   const actual = await vi.importActual<typeof import("antd")>("antd");
   const MockDragger = (props: any) => {
     draggerHandle.beforeUpload = props.beforeUpload;
+    draggerHandle.onChange = props.onChange;
     return (
       <div data-testid="upload-dragger">
         {props.children}
@@ -296,6 +297,17 @@ describe("BatchDetailView", () => {
         name: "Jan.pdf",
         size: 1234,
         type: "application/pdf",
+      });
+      draggerHandle.onChange?.({
+        fileList: [
+          {
+            uid: "file-1",
+            name: "Jan.pdf",
+            size: 1234,
+            type: "application/pdf",
+            originFileObj: { name: "Jan.pdf", size: 1234, type: "application/pdf" },
+          },
+        ],
       });
     });
 

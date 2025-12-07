@@ -7,6 +7,29 @@ export type BatchIssueCsvRow = {
   values?: string | null;
 };
 
+export type BatchIssueCsvSummary = {
+  batchId: string;
+  periodLabel: string | null;
+  payDate: string | null;
+  status: string | null;
+  processedFiles: number | null;
+  totalFiles: number | null;
+  criticalCount: number;
+  warningCount: number;
+  infoCount: number;
+};
+
+const SUMMARY_HEADERS = [
+  "batch_id",
+  "period_label",
+  "pay_date",
+  "status",
+  "processed_files",
+  "total_files",
+  "critical_issues",
+  "warning_issues",
+  "info_issues",
+];
 const HEADERS = ["employee", "employee_ref", "rule_code", "severity", "description", "values"];
 
 const sanitise = (value: string | null | undefined) => {
@@ -16,8 +39,28 @@ const sanitise = (value: string | null | undefined) => {
   return needsQuotes ? `"${escaped}"` : escaped;
 };
 
-export function buildBatchIssuesCsv(rows: BatchIssueCsvRow[]): string {
-  const lines = [HEADERS.join(",")];
+const formatNullableNumber = (value: number | null) =>
+  value === null || value === undefined ? "" : String(value);
+
+export function buildBatchIssuesCsv(rows: BatchIssueCsvRow[], summary: BatchIssueCsvSummary): string {
+  const lines = [
+    SUMMARY_HEADERS.join(","),
+    [
+      summary.batchId,
+      summary.periodLabel ?? "",
+      summary.payDate ?? "",
+      summary.status ?? "",
+      formatNullableNumber(summary.processedFiles),
+      formatNullableNumber(summary.totalFiles),
+      formatNullableNumber(summary.criticalCount),
+      formatNullableNumber(summary.warningCount),
+      formatNullableNumber(summary.infoCount),
+    ]
+      .map(sanitise)
+      .join(","),
+    "",
+    HEADERS.join(","),
+  ];
 
   rows.forEach((row) => {
     const cells = [
@@ -33,4 +76,3 @@ export function buildBatchIssuesCsv(rows: BatchIssueCsvRow[]): string {
 
   return lines.join("\r\n");
 }
-

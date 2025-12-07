@@ -73,3 +73,23 @@ export async function listBatchDataFiles(
 
   return (data ?? []) as BatchDataFile[];
 }
+
+export async function resetFailedBatchDataFiles(
+  organisationId: string,
+  batchId: string
+): Promise<number> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("batch_data_files")
+    .update({ parsed_status: "pending", parsed_error: null })
+    .eq("organisation_id", organisationId)
+    .eq("batch_id", batchId)
+    .eq("parsed_status", "failed")
+    .select("id");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).length;
+}

@@ -12,8 +12,12 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@headlessui/react": "^2.2.6",
+    "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.86.0",
+    "clsx": "^2.1.1",
     "antd": "^6.0.0",
+    "motion": "^12.23.11",
     "next": "^16.0.7",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
@@ -24,8 +28,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@tailwindcss/postcss": "^4.1.15",
     "@vitejs/plugin-react": "^4.7.0",
     "jsdom": "^22.1.0",
+    "tailwindcss": "^4.1.15",
     "typescript": "^5",
     "vitest": "^4.0.14"
   },

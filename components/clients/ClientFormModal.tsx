@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Form, Input, Modal, Select } from "antd";
 import type { ClientCreateInput } from "@/lib/repositories/clients";
 
@@ -28,22 +28,30 @@ export function ClientFormModal({
 }: ClientFormModalProps) {
   const [form] = Form.useForm<ClientFormValues>();
   const [submitting, setSubmitting] = useState(false);
+  const formInitialValues = useMemo(
+    () => ({ ...(initialValues ?? {}) }),
+    [initialValues]
+  );
 
   useEffect(() => {
     if (open) {
-      form.setFieldsValue({
-        payroll_system: "Unknown",
-        ...initialValues,
-      });
+      form.setFieldsValue(formInitialValues);
     } else {
       form.resetFields();
     }
-  }, [open, initialValues, form]);
+  }, [open, formInitialValues, form]);
 
   const handleFinish = async (values: ClientFormValues) => {
     setSubmitting(true);
     try {
-      await onSubmit(values);
+      const payload: ClientFormValues = { ...values };
+      const payrollSystem = payload.payroll_system?.trim();
+      if (payrollSystem) {
+        payload.payroll_system = payrollSystem;
+      } else {
+        delete payload.payroll_system;
+      }
+      await onSubmit(payload);
       form.resetFields();
     } finally {
       setSubmitting(false);
@@ -62,7 +70,7 @@ export function ClientFormModal({
       <Form
         layout="vertical"
         form={form}
-        initialValues={initialValues}
+        initialValues={formInitialValues}
         onFinish={handleFinish}
       >
         <Form.Item
@@ -87,11 +95,7 @@ export function ClientFormModal({
             }}
           />
         </Form.Item>
-        <Form.Item
-          label="Payroll system"
-          name="payroll_system"
-          rules={[{ required: true, message: "Enter the payroll system (required)" }]}
-        >
+        <Form.Item label="Payroll system" name="payroll_system">
           <Input placeholder="Eg. Sage" />
         </Form.Item>
       </Form>

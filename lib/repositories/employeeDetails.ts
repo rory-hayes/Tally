@@ -32,6 +32,11 @@ export type EmployeeComparison = {
   issues: IssueRow[];
 };
 
+type PayslipEmployeeRelation = {
+  name: string | null;
+  external_employee_ref: string | null;
+};
+
 type PayslipRecord = {
   id: string;
   organisation_id: string;
@@ -54,8 +59,12 @@ type PayslipRecord = {
   ytd_tax?: number | null;
   ytd_usc_or_ni?: number | null;
   prsi_or_ni_category?: string | null;
-  employees: { name: string | null; external_employee_ref: string | null } | null;
+  employees: PayslipEmployeeRelation | PayslipEmployeeRelation[] | null;
 };
+
+const isSingleEmployeeRelation = (
+  relation: PayslipRecord["employees"]
+): relation is PayslipEmployeeRelation => !!relation && !Array.isArray(relation);
 
 export const pickPreviousPayslip = (
   payslips: PayslipRecord[] | null | undefined,
@@ -139,14 +148,13 @@ export async function fetchEmployeeComparison(args: {
     payslips as PayslipRecord[] | null | undefined,
     batchId
   );
-  const employeeName =
-    currentPayslip.employees && !Array.isArray(currentPayslip.employees)
-      ? (currentPayslip.employees as PayslipRecord["employees"])?.name ?? "Employee"
-      : "Employee";
-  const employeeRef =
-    currentPayslip.employees && !Array.isArray(currentPayslip.employees)
-      ? (currentPayslip.employees as PayslipRecord["employees"])?.external_employee_ref ?? null
-      : null;
+  const employeeRelation = currentPayslip.employees;
+  const employeeName = isSingleEmployeeRelation(employeeRelation)
+    ? employeeRelation.name ?? "Employee"
+    : "Employee";
+  const employeeRef = isSingleEmployeeRelation(employeeRelation)
+    ? employeeRelation.external_employee_ref ?? null
+    : null;
 
   const diff = calculateDiff(
     (previousPayslip as PayslipLike | null | undefined),

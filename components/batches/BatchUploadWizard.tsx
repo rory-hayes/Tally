@@ -729,7 +729,11 @@ export function BatchUploadWizard({
               placeholder="YYYY-MM-DD"
               allowClear
               onBlur={(event) => {
-                const value = event.target.value.trim();
+                const target = event.target;
+                if (!(target instanceof HTMLInputElement)) {
+                  return;
+                }
+                const value = target.value.trim();
                 if (!value) return;
                 if (!dayjs(value, "YYYY-MM-DD", true).isValid()) {
                   message.error("Enter pay date as YYYY-MM-DD");

@@ -282,7 +282,6 @@ function SettingsView() {
                       options={[
                         { value: "core-tax", label: "Core tax rules (IE/UK)" },
                         { value: "reconciliation", label: "Reconciliation (register/GL/bank/submissions)" },
-                        { value: "contract-compliance", label: "Contract compliance" },
                       ]}
                       placeholder="Select packs to run"
                     />

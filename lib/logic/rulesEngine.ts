@@ -8,7 +8,6 @@ import type {
   RuleConfig,
   IeRuleContext,
   UkRuleContext,
-  ContractProfile,
 } from "@/lib/rules/types";
 
 export type RuleRuntimeOptions = {
@@ -17,7 +16,6 @@ export type RuleRuntimeOptions = {
   config?: RuleConfig;
   ieContext?: IeRuleContext | null;
   ukContext?: UkRuleContext | null;
-  contractProfile?: ContractProfile | null;
 };
 
 export type { IssueCandidate, RuleCode, IssueSeverity } from "@/lib/rules/types";
@@ -43,7 +41,6 @@ export const runRules = (
     options.config ?? getDefaultRuleConfig(derivedCountry, derivedTaxYear);
   const ieContext = options.ieContext ?? null;
   const ukContext = options.ukContext ?? null;
-  const contractProfile = options.contractProfile ?? null;
 
   const activeRules = getActiveRules(derivedCountry, derivedTaxYear);
 
@@ -58,7 +55,6 @@ export const runRules = (
         config: derivedConfig,
         ieContext,
         ukContext,
-        contractProfile,
       })
     );
 

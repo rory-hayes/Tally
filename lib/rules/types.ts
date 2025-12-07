@@ -46,16 +46,6 @@ export type IssueCandidate = {
 
 export type CountryCode = "IE" | "UK" | string;
 
-export type ContractProfile = {
-  salaryAmount?: number | null;
-  salaryPeriod?: "annual" | "monthly" | "weekly" | "daily" | "hourly" | null;
-  hourlyRate?: number | null;
-  standardHoursPerWeek?: number | null;
-  effectiveFrom?: string | null;
-  effectiveTo?: string | null;
-  metadata?: Record<string, unknown> | null;
-};
-
 export type RuleEvaluationContext = {
   current: PayslipLike;
   previous: PayslipLike | null;
@@ -65,7 +55,6 @@ export type RuleEvaluationContext = {
   config: RuleConfig;
   ieContext?: IeRuleContext | null;
   ukContext?: UkRuleContext | null;
-  contractProfile?: ContractProfile | null;
 };
 
 export type RuleEvaluationOutcome = {
@@ -129,5 +118,4 @@ export type UkRuleContext = {
     hasPostgradLoan?: boolean;
     payFrequency?: PayFrequency | null;
   };
-  contract?: ContractProfile | null;
 };

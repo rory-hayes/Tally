@@ -84,8 +84,6 @@ export default function AppLayout({ children }: PropsWithChildren) {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
-          openKeys={[]}
-          onOpenChange={() => undefined}
           onClick={handleMenuClick}
           items={menuItems}
         />

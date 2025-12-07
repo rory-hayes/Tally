@@ -26,9 +26,6 @@ const TYPE_SLUG_MAP: Record<string, DataSourceType> = {
   STATUTORY_SUBMISSION: "STATUTORY_SUBMISSION",
   hmrc_submission: "STATUTORY_SUBMISSION",
   statutory_submission: "STATUTORY_SUBMISSION",
-  CONTRACT_SNAPSHOT: "CONTRACT_SNAPSHOT",
-  hr_snapshot: "CONTRACT_SNAPSHOT",
-  contract_snapshot: "CONTRACT_SNAPSHOT",
 };
 
 const REQUIRED_HEADERS: Partial<Record<DataSourceType, string[]>> = {
@@ -246,4 +243,3 @@ export async function POST(
   const params = await context.params;
   return handleArtefactUpload(request, params.batchId);
 }
-

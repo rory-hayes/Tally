@@ -386,20 +386,6 @@ describe("runRules", () => {
     expect(issues.map((i) => i.ruleCode)).not.toContain("UK_STUDENT_LOAN_MISMATCH");
   });
 
-  it("handles contract profile context without triggering rules", () => {
-    const current = { ...baseCurrent, gross_pay: 3000 };
-    const diff = calculateDiff(basePrevious, current);
-    const issues = runRules(current, basePrevious, diff, {
-      ...defaultOptions,
-      contractProfile: {
-        salaryAmount: 60000,
-        salaryPeriod: "annual",
-        standardHoursPerWeek: 37.5,
-      },
-    });
-    expect(issues.map((i) => i.ruleCode)).not.toContain("NET_CHANGE_LARGE");
-  });
-
   it("consumes newly registered rules without engine changes", () => {
     const customRule: RuleDefinition = {
       code: "PRSI_CATEGORY_CHANGE",

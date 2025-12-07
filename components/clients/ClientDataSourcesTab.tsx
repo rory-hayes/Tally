@@ -27,7 +27,6 @@ const sourceTypes: DataSourceType[] = [
   "GROSS_TO_NET",
   "BANK_PAYMENTS",
   "STATUTORY_SUBMISSION",
-  "CONTRACT_SNAPSHOT",
 ];
 
 type ClientDataSourcesTabProps = {

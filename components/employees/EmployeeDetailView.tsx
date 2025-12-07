@@ -23,7 +23,6 @@ import type { ColumnsType } from "antd/es/table";
 import { useEmployeeComparison } from "@/hooks/useEmployeeComparison";
 import type { IssueSeverity, IssueRow } from "@/lib/repositories/employeeDetails";
 import { useOrganisation } from "@/context/OrganisationContext";
-import { ContractEditor } from "@/components/employees/ContractEditor";
 
 const fieldLabels: Record<string, string> = {
   gross_pay: "Gross pay",
@@ -304,8 +303,6 @@ export function EmployeeDetailView({ employeeId, batchId }: EmployeeDetailViewPr
           </Card>
         </Col>
       </Row>
-
-      <ContractEditor employeeId={employeeId} />
 
       <Card title="Field differences">
         {diffRows.length === 0 ? (

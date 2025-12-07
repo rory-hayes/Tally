@@ -97,7 +97,6 @@ Accounting firms gain:
 - General Ledger (GL) postings  
 - Bank payment files (SEPA/BACS)  
 - ROS (Ireland) and RTI (UK) submission summaries  
-- Contract / HR data  
 
 These allow Tally to evolve into a **full payroll audit and reconciliation platform**.
 

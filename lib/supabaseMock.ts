@@ -4,8 +4,7 @@ type TableName =
   | "batches"
   | "payslips"
   | "issues"
-  | "processing_jobs"
-  | "contracts";
+  | "processing_jobs";
 
 type Filter = (row: any) => boolean;
 
@@ -98,7 +97,6 @@ const defaultData: Record<TableName, any[]> = {
     },
   ],
   processing_jobs: [],
-  contracts: [],
 };
 
 class MockQueryBuilder {
@@ -247,7 +245,6 @@ export const createMockSupabaseClient = (seed?: Partial<Record<TableName, any[]>
     payslips: [...defaultData.payslips],
     issues: [...defaultData.issues],
     processing_jobs: [...defaultData.processing_jobs],
-    contracts: [...defaultData.contracts],
     ...(seed ? Object.fromEntries(Object.entries(seed).map(([k, v]) => [k as TableName, v])) : {}),
   } as Record<TableName, any[]>;
 

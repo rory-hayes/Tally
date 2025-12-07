@@ -10,7 +10,6 @@ import type {
   RuleConfig,
   IeRuleContext,
   UkRuleContext,
-  ContractProfile,
 } from "../../../lib/rules/types.ts";
 
 export const PAYSLIP_SELECT_FIELDS =
@@ -47,7 +46,6 @@ type BuildIssuesOptions = {
   config?: RuleConfig;
   ieContext?: IeRuleContext | null;
   ukContext?: UkRuleContext | null;
-  contractProfile?: ContractProfile | null;
 };
 
 export const buildIssuesForPayslip = (
@@ -72,7 +70,6 @@ export const buildIssuesForPayslip = (
     config: options?.config,
     ieContext: options?.ieContext ?? null,
     ukContext: options?.ukContext ?? null,
-    contractProfile: options?.contractProfile ?? null,
   });
 
   return issues.map((issue) => ({

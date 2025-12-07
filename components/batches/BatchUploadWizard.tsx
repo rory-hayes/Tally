@@ -18,7 +18,6 @@ import {
   message,
   Progress,
   Modal,
-  Tooltip,
 } from "antd";
 import type { RcFile, UploadFile } from "antd/es/upload/interface";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
@@ -59,11 +58,6 @@ const rulePackOptions = [
     label: "Reconciliation (register/GL/bank/submissions)",
     description: "Cross-check register totals, GL postings, bank payments, and ROS/RTI submissions against payslips.",
   },
-  {
-    id: "contract-compliance",
-    label: "Contract / HR compliance",
-    description: "Validate payslip rates against contract data, hours, and pension thresholds.",
-  },
 ];
 
 const artefactTypes: DataSourceType[] = [
@@ -72,7 +66,6 @@ const artefactTypes: DataSourceType[] = [
   "GROSS_TO_NET",
   "BANK_PAYMENTS",
   "STATUTORY_SUBMISSION",
-  "CONTRACT_SNAPSHOT",
 ];
 
 const artefactFieldHelp: Partial<Record<DataSourceType, string[]>> = {
@@ -80,15 +73,6 @@ const artefactFieldHelp: Partial<Record<DataSourceType, string[]>> = {
   GL_EXPORT: ["wages", "employer_taxes", "pensions", "other", "currency"],
   BANK_PAYMENTS: ["employee_id", "amount", "currency", "reference"],
   STATUTORY_SUBMISSION: ["paye_total", "usc_or_ni_total", "employee_count", "tax_year", "source_file"],
-  CONTRACT_SNAPSHOT: [
-    "employee_id",
-    "salary_amount",
-    "salary_period",
-    "hourly_rate",
-    "standard_hours_per_week",
-    "effective_from",
-    "effective_to",
-  ],
   GROSS_TO_NET: ["period_label", "total_gross", "total_net", "employee_count"],
 };
 
@@ -137,21 +121,6 @@ const artefactTemplates: Partial<
     rows: [
       ["paye_total", "usc_or_ni_total", "employee_count", "tax_year", "source_file"],
       ["1100", "190", "2", "2025", "RTI-FPS-APR.csv"],
-    ],
-  },
-  CONTRACT_SNAPSHOT: {
-    filename: "contracts_template.csv",
-    rows: [
-      [
-        "employee_id",
-        "salary_amount",
-        "salary_period",
-        "hourly_rate",
-        "standard_hours_per_week",
-        "effective_from",
-        "effective_to",
-      ],
-      ["EMP001", "52000", "annual", "", "40", "2025-01-01", ""],
     ],
   },
   GROSS_TO_NET: {
@@ -219,6 +188,8 @@ export function BatchUploadWizard({
   const [summary, setSummary] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const allowedRulePackIds = useMemo(() => new Set(rulePackOptions.map((opt) => opt.id)), []);
+  const allowedArtefactTypes = useMemo(() => new Set<DataSourceType>(artefactTypes), []);
   const formatDate = (value?: string | null) => {
     if (!value) return "—";
     const date = new Date(`${value}T00:00:00`);
@@ -248,17 +219,20 @@ export function BatchUploadWizard({
         const uploadedTypes = new Set<DataSourceType>();
         const summaries: Record<string, string> = {};
         files.forEach((file) => {
+          if (!allowedArtefactTypes.has(file.type)) {
+            return;
+          }
           uploadedTypes.add(file.type);
           summaries[file.type] = file.original_filename ?? "Uploaded";
         });
         setUploadedArtefactTypes(uploadedTypes);
         setSummary((prev) => ({ ...prev, ...summaries }));
-        setArtefactUploadsCompleted(files.length > 0);
+        setArtefactUploadsCompleted(uploadedTypes.size > 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to load existing artefacts");
       }
     },
-    [organisationId, clientId]
+    [organisationId, clientId, allowedArtefactTypes]
   );
 
   useEffect(() => {
@@ -287,18 +261,7 @@ export function BatchUploadWizard({
   }, [hasUnsavedChanges]);
 
   const configuredTypes = useMemo(() => new Set(dataSources.map((s) => s.type)), [dataSources]);
-  const contractPackReady = useMemo(
-    () => configuredTypes.has("CONTRACT_SNAPSHOT") && uploadedArtefactTypes.has("CONTRACT_SNAPSHOT"),
-    [configuredTypes, uploadedArtefactTypes]
-  );
   const draftStorageKey = `tally-batch-draft-${clientId}`;
-
-  useEffect(() => {
-    if (contractPackReady && !selectedRulePacks.includes("contract-compliance")) {
-      setSelectedRulePacks((prev) => [...prev, "contract-compliance"]);
-      setHasUnsavedChanges(true);
-    }
-  }, [contractPackReady, selectedRulePacks]);
 
   useEffect(() => {
     const restoreDraft = async () => {
@@ -320,10 +283,18 @@ export function BatchUploadWizard({
           pay_frequency: draft.pay_frequency ?? "monthly",
         });
         if (draft.selectedRulePacks?.length) {
-          setSelectedRulePacks(draft.selectedRulePacks);
+          const filtered = draft.selectedRulePacks.filter((id) => allowedRulePackIds.has(id));
+          if (filtered.length) {
+            setSelectedRulePacks(filtered);
+          }
         }
         if (draft.uploadedArtefactTypes?.length) {
-          setUploadedArtefactTypes(new Set(draft.uploadedArtefactTypes));
+          const filteredArtefacts = draft.uploadedArtefactTypes.filter((type) =>
+            allowedArtefactTypes.has(type as DataSourceType)
+          ) as DataSourceType[];
+          if (filteredArtefacts.length) {
+            setUploadedArtefactTypes(new Set(filteredArtefacts));
+          }
         }
         setHasUnsavedChanges(true);
         if (draft.batchId && !batchInfo) {
@@ -353,7 +324,7 @@ export function BatchUploadWizard({
       }
     };
     void restoreDraft();
-  }, [batchInfo, draftStorageKey, form, organisationId, syncDataFiles]);
+  }, [allowedArtefactTypes, allowedRulePackIds, batchInfo, draftStorageKey, form, organisationId, syncDataFiles]);
 
   const persistDraft = useCallback(() => {
     const values = form.getFieldsValue();
@@ -581,7 +552,6 @@ export function BatchUploadWizard({
           {type === "GL_EXPORT" && "Reconcile payroll vs accounting totals."}
           {type === "BANK_PAYMENTS" && "Validate net pay disbursements."}
           {type === "STATUTORY_SUBMISSION" && "Match ROS/RTI submissions to payroll totals."}
-          {type === "CONTRACT_SNAPSHOT" && "Enrich rules with contract data."}
           {type === "GROSS_TO_NET" && "Batch-level summary from payroll system."}
         </Typography.Paragraph>
         {artefactFieldHelp[type]?.length ? (
@@ -838,40 +808,18 @@ export function BatchUploadWizard({
           >
             <Space direction="vertical" style={{ width: "100%" }}>
               {rulePackOptions.map((opt) => {
-                const requiresContracts = opt.id === "contract-compliance";
-                const disabled = requiresContracts && !contractPackReady;
-                const helper = requiresContracts
-                  ? contractPackReady
-                    ? "Enabled because a Contract snapshot has been uploaded for this batch."
-                    : "Configure the Contract data source and upload a Contract snapshot CSV in step 3."
-                  : null;
-                const checkboxNode = (
+                return (
                   <Checkbox
                     key={opt.id}
                     value={opt.id}
                     style={{ alignItems: "flex-start" }}
-                    disabled={disabled}
                   >
                     <Space direction="vertical" size={2}>
                       <Typography.Text strong>{opt.label}</Typography.Text>
                       <Typography.Text type="secondary">{opt.description}</Typography.Text>
-                      {helper ? (
-                        <Typography.Text type="secondary">{helper}</Typography.Text>
-                      ) : null}
                     </Space>
                   </Checkbox>
                 );
-                if (requiresContracts && disabled) {
-                  return (
-                    <Tooltip
-                      key={opt.id}
-                      title="Upload a Contract / HR snapshot in step 3 after configuring the Contract data source."
-                    >
-                      {checkboxNode}
-                    </Tooltip>
-                  );
-                }
-                return checkboxNode;
               })}
             </Space>
           </Checkbox.Group>
@@ -933,20 +881,6 @@ export function BatchUploadWizard({
           Guided wizard for payslips and monthly artefacts. Configure mappings in Client → Data sources.
         </Typography.Paragraph>
       </div>
-      <Alert
-        type="info"
-        showIcon
-        message="Pay date and mappings drive downstream checks."
-        description="The saved pay date is enforced for every payslip. We’ll block out-of-cycle documents until you confirm them, and drafts auto-save locally so you can resume later."
-      />
-      {hasUnsavedChanges ? (
-        <Alert
-          type="warning"
-          showIcon
-          message="Don't lose your progress"
-          description="We save this wizard as a draft in your browser and warn before you close the tab."
-        />
-      ) : null}
       {error ? <Alert type="error" message={error} showIcon /> : null}
       <Steps
         current={currentStep}

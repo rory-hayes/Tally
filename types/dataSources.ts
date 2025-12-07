@@ -4,8 +4,7 @@ export type DataSourceType =
   | "GL_EXPORT"
   | "GROSS_TO_NET"
   | "BANK_PAYMENTS"
-  | "STATUTORY_SUBMISSION"
-  | "CONTRACT_SNAPSHOT";
+  | "STATUTORY_SUBMISSION";
 
 export const dataSourceLabels: Record<DataSourceType, string> = {
   PAYSLIP_PDF: "Payslip PDF",
@@ -14,5 +13,4 @@ export const dataSourceLabels: Record<DataSourceType, string> = {
   GROSS_TO_NET: "Gross-to-net summary",
   BANK_PAYMENTS: "Bank payments",
   STATUTORY_SUBMISSION: "Revenue/HMRC submission",
-  CONTRACT_SNAPSHOT: "Contract / HR snapshot",
 };

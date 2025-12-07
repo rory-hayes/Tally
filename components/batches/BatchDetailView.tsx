@@ -83,6 +83,55 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     data?.jobs ?? { pending: 0, processing: 0, completed: 0, failed: 0, failedJobs: [] };
   const dataFiles = data?.dataFiles ?? [];
   const reconciliationIssues = data?.reconciliationIssues ?? [];
+  const hasValidFileTotals =
+    batch &&
+    typeof batch.processed_files === "number" &&
+    typeof batch.total_files === "number";
+  const processedLabel = hasValidFileTotals
+    ? `${batch.processed_files}/${batch.total_files} files processed`
+    : null;
+  const progressPercent =
+    hasValidFileTotals && batch.total_files > 0
+      ? Math.round((batch.processed_files / batch.total_files) * 100)
+      : 0;
+  const hasActiveJobs = jobSummary.pending + jobSummary.processing > 0;
+  const hasFailedJobs = jobSummary.failedJobs.length > 0;
+  const derivedStatus =
+    batch && batch.status === "processing" && hasFailedJobs && !hasActiveJobs
+      ? "failed"
+      : batch?.status ?? "pending";
+  const payDateLabel = formatPayDate(batch?.pay_date ?? null);
+  const createdAt = batch ? new Date(batch.created_at).toLocaleString() : "";
+  const dataFileBadges =
+    dataFiles && dataFiles.length
+      ? dataFiles.map((file) => ({
+          key: `${file.type}-${file.original_filename ?? ""}`,
+          label: file.original_filename ?? file.type,
+          status: file.parsed_status,
+          type: file.type,
+        }))
+      : [];
+
+  useEffect(() => {
+    if (!batch) return;
+    const previous = lastStatusRef.current;
+    if (previous && previous !== derivedStatus) {
+      if (derivedStatus === "completed") {
+        notification.success({
+          title: "Batch processing completed",
+          message: "Batch processing completed",
+          description: `${batch.period_label ?? "Batch"} (${payDateLabel}) has finished processing.`,
+        });
+      } else if (derivedStatus === "failed") {
+        notification.error({
+          title: "Batch processing finished with failures",
+          message: "Batch processing finished with failures",
+          description: "Review failed files below and retry once issues are fixed.",
+        });
+      }
+    }
+    lastStatusRef.current = derivedStatus;
+  }, [batch, derivedStatus, payDateLabel]);
 
   const draggerProps = useMemo(
     () => ({
@@ -281,54 +330,6 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
         ),
     },
   ];
-
-  const createdAt = new Date(batch.created_at).toLocaleString();
-  const payDateLabel = formatPayDate(batch.pay_date);
-  const hasValidFileTotals =
-    typeof batch.processed_files === "number" && typeof batch.total_files === "number";
-  const processedLabel = hasValidFileTotals
-    ? `${batch.processed_files}/${batch.total_files} files processed`
-    : null;
-  const progressPercent =
-    hasValidFileTotals && batch.total_files > 0
-      ? Math.round((batch.processed_files / batch.total_files) * 100)
-      : 0;
-  const hasActiveJobs = jobSummary.pending + jobSummary.processing > 0;
-  const hasFailedJobs = jobSummary.failedJobs.length > 0;
-  const derivedStatus =
-    batch.status === "processing" && hasFailedJobs && !hasActiveJobs
-      ? "failed"
-      : batch.status;
-  const dataFileBadges =
-    dataFiles && dataFiles.length
-      ? dataFiles.map((file) => ({
-          key: `${file.type}-${file.original_filename ?? ""}`,
-          label: file.original_filename ?? file.type,
-          status: file.parsed_status,
-          type: file.type,
-        }))
-      : [];
-
-  useEffect(() => {
-    if (!batch) return;
-    const previous = lastStatusRef.current;
-    if (previous && previous !== derivedStatus) {
-      if (derivedStatus === "completed") {
-        notification.success({
-          title: "Batch processing completed",
-          message: "Batch processing completed",
-          description: `${batch.period_label ?? "Batch"} (${payDateLabel}) has finished processing.`,
-        });
-      } else if (derivedStatus === "failed") {
-        notification.error({
-          title: "Batch processing finished with failures",
-          message: "Batch processing finished with failures",
-          description: "Review failed files below and retry once issues are fixed.",
-        });
-      }
-    }
-    lastStatusRef.current = derivedStatus;
-  }, [batch, derivedStatus, payDateLabel]);
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>

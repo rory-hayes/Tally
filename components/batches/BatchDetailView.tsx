@@ -41,6 +41,17 @@ const severityColors: Record<IssueSeverity, string> = {
   info: "blue",
 };
 
+const formatPayDate = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
 export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   const { organisationId, profileId } = useOrganisation();
   const router = useRouter();
@@ -68,6 +79,9 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   }, [refresh]);
 
   const batch = data?.batch ?? null;
+  const jobSummary =
+    data?.jobs ?? { pending: 0, processing: 0, completed: 0, failed: 0, failedJobs: [] };
+  const dataFiles = data?.dataFiles ?? [];
 
   const draggerProps = useMemo(
     () => ({
@@ -268,13 +282,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
   ];
 
   const createdAt = new Date(batch.created_at).toLocaleString();
-  const payDateLabel = batch.pay_date
-    ? new Date(batch.pay_date).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "—";
+  const payDateLabel = formatPayDate(batch.pay_date);
   const hasValidFileTotals =
     typeof batch.processed_files === "number" && typeof batch.total_files === "number";
   const processedLabel = hasValidFileTotals
@@ -284,15 +292,15 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
     hasValidFileTotals && batch.total_files > 0
       ? Math.round((batch.processed_files / batch.total_files) * 100)
       : 0;
-  const hasActiveJobs = data.jobs.pending + data.jobs.processing > 0;
-  const hasFailedJobs = data.jobs.failedJobs.length > 0;
+  const hasActiveJobs = jobSummary.pending + jobSummary.processing > 0;
+  const hasFailedJobs = jobSummary.failedJobs.length > 0;
   const derivedStatus =
     batch.status === "processing" && hasFailedJobs && !hasActiveJobs
       ? "failed"
       : batch.status;
   const dataFileBadges =
-    data.dataFiles && data.dataFiles.length
-      ? data.dataFiles.map((file) => ({
+    dataFiles && dataFiles.length
+      ? dataFiles.map((file) => ({
           key: `${file.type}-${file.original_filename ?? ""}`,
           label: file.original_filename ?? file.type,
           status: file.parsed_status,
@@ -393,7 +401,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
               <span data-testid="batch-file-progress">{processedLabel}</span>
               {hasFailedJobs && (
                 <Tag color="red" style={{ marginLeft: 8 }} data-testid="batch-failed-count-tag">
-                  {data.jobs.failed} failed
+                  {jobSummary.failed} failed
                 </Tag>
               )}
             </Typography.Paragraph>
@@ -414,11 +422,11 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             type="error"
             showIcon
             style={{ marginTop: 12 }}
-            title={`${data.jobs.failed} file(s) failed during processing`}
+            title={`${jobSummary.failed} file(s) failed during processing`}
             description={
               <Space direction="vertical">
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {data.jobs.failedJobs.map((job) => (
+                  {jobSummary.failedJobs.map((job) => (
                     <li key={job.id}>
                       {job.storagePath.split("/").pop()} {job.error ? `– ${job.error}` : ""}
                     </li>
@@ -437,7 +445,7 @@ export function BatchDetailView({ batchId }: BatchDetailViewProps) {
             showIcon
             style={{ marginTop: 12 }}
             title="Processing in progress"
-            description={`${data.jobs.pending + data.jobs.processing} file(s) remaining…`}
+            description={`${jobSummary.pending + jobSummary.processing} file(s) remaining…`}
           />
         )}
       </Card>

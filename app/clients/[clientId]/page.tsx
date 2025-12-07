@@ -36,6 +36,16 @@ function useBatchColumns(
   onOpenBatch: (batch: BatchRow) => void,
   onDeleteBatch: (batch: BatchRow) => void
 ): ColumnsType<BatchRow> {
+  const formatPayDate = (value: string | null) => {
+    if (!value) return "—";
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
   return useMemo(
     () => [
       {
@@ -47,14 +57,7 @@ function useBatchColumns(
         title: "Pay date",
         dataIndex: "pay_date",
         key: "pay_date",
-        render: (value: string | null) =>
-          value
-            ? new Date(value).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })
-            : "—",
+        render: (value: string | null) => formatPayDate(value),
       },
       {
         title: "Status",

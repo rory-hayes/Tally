@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
 import {
   Alert,
   Button,
@@ -16,6 +17,7 @@ import {
   Tag,
   message,
   Progress,
+  Modal,
 } from "antd";
 import type { RcFile, UploadFile } from "antd/es/upload/interface";
 import { uploadBatchFiles } from "@/lib/storage/batchUploads";
@@ -203,6 +205,7 @@ export function BatchUploadWizard({
     anchor.download = template.filename;
     anchor.click();
     URL.revokeObjectURL(url);
+    setHasUnsavedChanges(true);
   };
   const [dataSources, setDataSources] = useState<ClientDataSource[]>([]);
   const [loadingSources, setLoadingSources] = useState(false);
@@ -212,14 +215,17 @@ export function BatchUploadWizard({
   ]);
   const [summary, setSummary] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  const formatDate = (value?: string | null) =>
-    value
-      ? new Intl.DateTimeFormat("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }).format(new Date(value))
-      : "—";
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const formatDate = (value?: string | null) => {
+    if (!value) return "—";
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(date);
+  };
   const handleStepChange = (value: number) => {
     if (value <= currentStep) {
       setCurrentStep(value);
@@ -241,7 +247,63 @@ export function BatchUploadWizard({
     void loadSources();
   }, [organisationId, clientId]);
 
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
+
   const configuredTypes = useMemo(() => new Set(dataSources.map((s) => s.type)), [dataSources]);
+  const contractPackReady = configuredTypes.has("CONTRACT_SNAPSHOT");
+  const draftStorageKey = `tally-batch-draft-${clientId}`;
+
+  useEffect(() => {
+    if (batchInfo) return;
+    try {
+      const raw = localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        period_label?: string;
+        pay_date?: string | null;
+        pay_frequency?: string | null;
+        selectedRulePacks?: string[];
+      };
+      form.setFieldsValue({
+        period_label: draft.period_label,
+        pay_date: draft.pay_date ? dayjs(draft.pay_date) : undefined,
+        pay_frequency: draft.pay_frequency ?? "monthly",
+      });
+      if (draft.selectedRulePacks?.length) {
+        setSelectedRulePacks(draft.selectedRulePacks);
+      }
+    } catch {
+      // ignore invalid draft
+    }
+  }, [batchInfo, draftStorageKey, form, setSelectedRulePacks]);
+
+  const persistDraft = useCallback(() => {
+    if (batchInfo) return;
+    const values = form.getFieldsValue();
+    const payDateValue =
+      values.pay_date && typeof values.pay_date.format === "function"
+        ? values.pay_date.format("YYYY-MM-DD")
+        : null;
+    const payload = {
+      period_label: values.period_label ?? "",
+      pay_date: payDateValue,
+      pay_frequency: values.pay_frequency ?? "monthly",
+      selectedRulePacks,
+    };
+    try {
+      localStorage.setItem(draftStorageKey, JSON.stringify(payload));
+    } catch {
+      // best effort
+    }
+  }, [batchInfo, draftStorageKey, form, selectedRulePacks]);
 
   const handleCreateBatch = async () => {
     const values = await form.validateFields();
@@ -259,8 +321,10 @@ export function BatchUploadWizard({
       period_label: batch.period_label,
       pay_date: batch.pay_date ?? null,
     });
+    localStorage.removeItem(draftStorageKey);
     message.success("Batch created. Continue with uploads.");
     setCurrentStep(1);
+    setHasUnsavedChanges(true);
   };
 
   const draggerProps = {
@@ -278,6 +342,7 @@ export function BatchUploadWizard({
           originFileObj: file,
         },
       ]);
+      setHasUnsavedChanges(true);
       return false;
     },
     onRemove: (file: UploadFile) => {
@@ -423,6 +488,7 @@ export function BatchUploadWizard({
             };
             setArtefactFiles((prev) => ({ ...prev, [type]: uploadFile }));
             setArtefactErrors((prev) => ({ ...prev, [type]: null }));
+            setHasUnsavedChanges(true);
             return false;
           }}
           onRemove={() => {
@@ -461,7 +527,9 @@ export function BatchUploadWizard({
       message.error("Create batch first.");
       return;
     }
-    const payDate = batchInfo.pay_date ? new Date(batchInfo.pay_date) : new Date();
+    const payDate = batchInfo.pay_date
+      ? new Date(`${batchInfo.pay_date}T00:00:00`)
+      : new Date();
     const taxYear = payDate.getUTCFullYear();
     const resolvedConfig = getDefaultRuleConfig(
       (clientCountry as "IE" | "UK" | undefined) ?? "IE",
@@ -498,6 +566,7 @@ export function BatchUploadWizard({
         });
       }
       message.success("Batch created and processing started");
+      setHasUnsavedChanges(false);
       if (onComplete) onComplete(batchInfo.id);
     } catch (err) {
       message.error(err instanceof Error ? err.message : "Unable to start processing");
@@ -508,7 +577,22 @@ export function BatchUploadWizard({
     {
       title: "Batch details",
       content: (
-        <Form layout="vertical" form={form} initialValues={{ pay_frequency: "monthly" }}>
+        <Form
+          layout="vertical"
+          form={form}
+          initialValues={{ pay_frequency: "monthly" }}
+          onValuesChange={() => {
+            setHasUnsavedChanges(true);
+            persistDraft();
+          }}
+        >
+          <Alert
+            type="info"
+            showIcon
+            message="One pay date per batch"
+            description="All payslips in this batch should share the same pay date. We’ll flag any payslips whose document date differs from the batch pay date."
+            style={{ marginBottom: 16 }}
+          />
           <Form.Item
             label="Period label"
             name="period_label"
@@ -516,7 +600,11 @@ export function BatchUploadWizard({
           >
             <Input placeholder="Eg. January 2025" />
           </Form.Item>
-          <Form.Item label="Pay date" name="pay_date">
+          <Form.Item
+            label="Pay date"
+            name="pay_date"
+            rules={[{ required: true, message: "Select a pay date for this batch" }]}
+          >
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item label="Frequency" name="pay_frequency">
@@ -602,18 +690,38 @@ export function BatchUploadWizard({
           </Typography.Paragraph>
           <Checkbox.Group
             value={selectedRulePacks}
-            onChange={(values) => setSelectedRulePacks(values as string[])}
+            onChange={(values) => {
+              setSelectedRulePacks(values as string[]);
+              setHasUnsavedChanges(true);
+              persistDraft();
+            }}
             style={{ width: "100%" }}
           >
             <Space direction="vertical" style={{ width: "100%" }}>
-              {rulePackOptions.map((opt) => (
-                <Checkbox key={opt.id} value={opt.id} style={{ alignItems: "flex-start" }}>
-                  <Space direction="vertical" size={2}>
-                    <Typography.Text strong>{opt.label}</Typography.Text>
-                    <Typography.Text type="secondary">{opt.description}</Typography.Text>
-                  </Space>
-                </Checkbox>
-              ))}
+              {rulePackOptions.map((opt) => {
+                const disabled =
+                  opt.id === "contract-compliance" && !contractPackReady;
+                const helper =
+                  opt.id === "contract-compliance" && !contractPackReady
+                    ? "Enable by configuring Contract data source and uploading a contract CSV in step 3."
+                    : null;
+                return (
+                  <Checkbox
+                    key={opt.id}
+                    value={opt.id}
+                    style={{ alignItems: "flex-start" }}
+                    disabled={disabled}
+                  >
+                    <Space direction="vertical" size={2}>
+                      <Typography.Text strong>{opt.label}</Typography.Text>
+                      <Typography.Text type="secondary">{opt.description}</Typography.Text>
+                      {helper ? (
+                        <Typography.Text type="secondary">{helper}</Typography.Text>
+                      ) : null}
+                    </Space>
+                  </Checkbox>
+                );
+              })}
             </Space>
           </Checkbox.Group>
           <div style={{ marginTop: 16 }}>
@@ -680,6 +788,14 @@ export function BatchUploadWizard({
         message="Pay date and mappings drive downstream checks."
         description="The pay date saved in step 1 is reused for all payslips and employee views. Use the Data sources tab to store mapping JSON; each artefact card includes required columns and a sample CSV."
       />
+      {hasUnsavedChanges ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Don't lose your progress"
+          description="We’ll warn before you close this tab. Finish the steps or click Create & start processing to save your batch."
+        />
+      ) : null}
       {error ? <Alert type="error" message={error} showIcon /> : null}
       <Steps
         current={currentStep}

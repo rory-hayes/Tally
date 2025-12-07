@@ -177,6 +177,13 @@ async function handleJob(
       throw new Error("Unable to determine pay date for payslip");
     }
     const currentPayslip = await insertPayslip(supabase, job, employeeId, normalized, payDate);
+    await insertPayDateMismatchIssue(
+      supabase,
+      job,
+      employeeId,
+      payDate,
+      normalized.pay_date
+    );
     await insertInfoIssue(supabase, job, employeeId, normalized);
     await insertRuleIssues(supabase, currentPayslip, previousPayslip);
     await markJobStatus(supabase, job.id, true);
@@ -271,6 +278,33 @@ async function insertPayslip(
   }
 
   return data as PayslipForRules;
+}
+
+async function insertPayDateMismatchIssue(
+  supabase: ReturnType<typeof createClient>,
+  job: JobRow,
+  employeeId: string,
+  batchPayDate: string,
+  parsedPayDate: string | null
+) {
+  if (!parsedPayDate || parsedPayDate === batchPayDate) {
+    return;
+  }
+
+  await supabase.from("issues").insert({
+    organisation_id: job.organisation_id,
+    client_id: job.client_id,
+    batch_id: job.batch_id,
+    employee_id: employeeId,
+    rule_code: "pay_date_mismatch",
+    severity: "warning",
+    description: `Payslip pay date ${parsedPayDate} differs from batch pay date ${batchPayDate}. Using batch date.`,
+    data: {
+      batchPayDate,
+      parsedPayDate,
+    },
+    note: null,
+  });
 }
 
 async function insertInfoIssue(

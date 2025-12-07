@@ -123,17 +123,15 @@ const renderIssueDataDetails = (data?: Record<string, unknown> | null): ReactNod
   );
 };
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
-
 const formatDisplayDate = (dateString?: string | null, fallbackLabel?: string | null) => {
   if (dateString) {
-    const parsed = new Date(dateString);
+    const parsed = new Date(`${dateString}T00:00:00`);
     if (!Number.isNaN(parsed.getTime())) {
-      return dateFormatter.format(parsed);
+      return parsed.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
     }
   }
   if (fallbackLabel) {
